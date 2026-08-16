@@ -3,13 +3,21 @@ import {
   computeCycleState,
   validateTransactionLitres,
   isEligibleForNewCycle,
+  canRecordTransaction,
 } from "@/lib/services/petrol-cycle-logic";
 import { parsePlateParity } from "@/lib/services/license-plate-service";
 import {
   getDrivingDaysInMonth,
   isDrivingAllowedForParity,
 } from "@/lib/services/vehicle-restriction-service";
-import { addAppDays, parseAppDateInput, startOfAppDay } from "@/lib/timezone";
+import {
+  addAppDays,
+  formatAppDateInput,
+  getAppDayOfMonth,
+  getAppMonthDays,
+  parseAppDateInput,
+  startOfAppDay,
+} from "@/lib/timezone";
 
 const TZ = "Asia/Yangon";
 
@@ -32,8 +40,9 @@ describe("petrol cycle logic", () => {
     expect(result.totalTaken).toBe(40);
     expect(result.status).toBe("COMPLETED");
     expect(result.completedAt?.toISOString()).toBe(startOfAppDay(d("2026-08-15"), TZ).toISOString());
+    expect(result.cycleStartedAt?.toISOString()).toBe(startOfAppDay(d("2026-08-11"), TZ).toISOString());
     expect(result.nextEligibleAt?.toISOString()).toBe(
-      addAppDays(startOfAppDay(d("2026-08-15"), TZ), 7, TZ).toISOString(),
+      addAppDays(startOfAppDay(d("2026-08-11"), TZ), 7, TZ).toISOString(),
     );
   });
 
@@ -52,15 +61,19 @@ describe("petrol cycle logic", () => {
     expect(result.status).toBe("COMPLETED");
     expect(result.completedAt?.toISOString()).toBe(startOfAppDay(d("2026-08-15"), TZ).toISOString());
     expect(result.nextEligibleAt?.toISOString()).toBe(
-      addAppDays(startOfAppDay(d("2026-08-15"), TZ), 7, TZ).toISOString(),
+      addAppDays(startOfAppDay(d("2026-08-11"), TZ), 7, TZ).toISOString(),
     );
   });
 
-  it("keeps cycle open after partial refill", () => {
+  it("keeps cycle open after partial refill until the first refill window expires", () => {
     const result = computeCycleState(40, [{ litres: 10, transactionAt: d("2026-08-11") }], 7, TZ);
     expect(result.status).toBe("OPEN");
     expect(result.remainingLitres).toBe(30);
-    expect(result.nextEligibleAt).toBeNull();
+    expect(result.nextEligibleAt?.toISOString()).toBe(
+      addAppDays(startOfAppDay(d("2026-08-11"), TZ), 7, TZ).toISOString(),
+    );
+    expect(canRecordTransaction(result, d("2026-08-17"), TZ)).toBe(true);
+    expect(canRecordTransaction(result, d("2026-08-18"), TZ)).toBe(false);
   });
 
   it("handles 39L taken with 1L remaining", () => {
@@ -74,7 +87,7 @@ describe("petrol cycle logic", () => {
     expect(validateTransactionLitres(5, 5).valid).toBe(true);
   });
 
-  it("calculates next eligible from completion not first transaction", () => {
+  it("calculates next eligible from the first transaction in the cycle", () => {
     const completed = computeCycleState(
       40,
       [
@@ -85,9 +98,21 @@ describe("petrol cycle logic", () => {
       TZ,
     );
 
-    expect(completed.nextEligibleAt?.toISOString()).not.toBe(
+    expect(completed.nextEligibleAt?.toISOString()).toBe(
       addAppDays(startOfAppDay(d("2026-08-11"), TZ), 7, TZ).toISOString(),
     );
+  });
+
+  it("resets partial unused allocation one week after first withdrawal", () => {
+    const partial = computeCycleState(40, [{ litres: 18, transactionAt: d("2026-08-10") }], 7, TZ);
+
+    expect(partial.status).toBe("OPEN");
+    expect(partial.remainingLitres).toBe(22);
+    expect(partial.nextEligibleAt?.toISOString()).toBe(
+      addAppDays(startOfAppDay(d("2026-08-10"), TZ), 7, TZ).toISOString(),
+    );
+    expect(isEligibleForNewCycle(partial, d("2026-08-17"), TZ)).toBe(true);
+    expect(canRecordTransaction(partial, d("2026-08-17"), TZ)).toBe(false);
   });
 
   it("marks eligible on next cycle date", () => {
@@ -116,6 +141,19 @@ describe("app date parsing", () => {
   it("parses date-only refill input at the configured app day", () => {
     const parsed = parseAppDateInput("2026-08-15", TZ);
     expect(startOfAppDay(parsed, TZ).toISOString()).toBe(startOfAppDay(d("2026-08-15"), TZ).toISOString());
+  });
+
+  it("formats date input from the app timezone instead of UTC", () => {
+    const utcEveningBeforeMyanmarDay = new Date("2026-08-15T18:30:00.000Z");
+    expect(formatAppDateInput(utcEveningBeforeMyanmarDay, TZ)).toBe("2026-08-16");
+  });
+
+  it("builds month days using app timezone calendar dates", () => {
+    const days = getAppMonthDays(new Date("2026-08-31T20:00:00.000Z"), TZ);
+
+    expect(days).toHaveLength(30);
+    expect(getAppDayOfMonth(days[0], TZ)).toBe(1);
+    expect(getAppDayOfMonth(days[days.length - 1], TZ)).toBe(30);
   });
 });
 

@@ -11,6 +11,7 @@ export type CycleComputation = {
   totalTaken: number;
   remainingLitres: number;
   status: PetrolCycleStatus;
+  cycleStartedAt: Date | null;
   completedAt: Date | null;
   nextEligibleAt: Date | null;
   completionTransactionDate: Date | null;
@@ -31,14 +32,21 @@ export function computeCycleState(
   );
   const totalTaken = sumTransactionLitres(sorted);
   const remainingLitres = Math.max(0, allowedLitres - totalTaken);
+  const cycleStartedAt = sorted[0]
+    ? startOfAppDay(sorted[0].transactionAt, timezone)
+    : null;
+  const nextEligibleAt = cycleStartedAt
+    ? addAppDays(cycleStartedAt, cycleIntervalDays, timezone)
+    : null;
 
   if (totalTaken < allowedLitres) {
     return {
       totalTaken,
       remainingLitres,
       status: "OPEN",
+      cycleStartedAt,
       completedAt: null,
-      nextEligibleAt: null,
+      nextEligibleAt,
       completionTransactionDate: null,
     };
   }
@@ -55,14 +63,12 @@ export function computeCycleState(
   }
 
   const completedAt = completionTransactionDate;
-  const nextEligibleAt = completedAt
-    ? addAppDays(completedAt, cycleIntervalDays, timezone)
-    : null;
 
   return {
     totalTaken,
     remainingLitres: 0,
     status: "COMPLETED",
+    cycleStartedAt,
     completedAt,
     nextEligibleAt,
     completionTransactionDate,
@@ -92,8 +98,8 @@ export function isEligibleForNewCycle(
   asOf: Date,
   timezone?: string,
 ): boolean {
-  if (computation.status !== "COMPLETED" || !computation.nextEligibleAt) {
-    return computation.status === "OPEN" && computation.remainingLitres > 0;
+  if (!computation.nextEligibleAt) {
+    return false;
   }
 
   const today = startOfAppDay(asOf, timezone);
@@ -106,7 +112,7 @@ export function canRecordTransaction(
   timezone?: string,
 ): boolean {
   if (computation.status === "OPEN" && computation.remainingLitres > 0) {
-    return true;
+    return !isEligibleForNewCycle(computation, asOf, timezone);
   }
 
   if (computation.status === "COMPLETED") {

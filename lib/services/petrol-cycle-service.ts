@@ -14,9 +14,9 @@ import {
   computeCycleState,
   validateTransactionLitres,
   canRecordTransaction,
+  isEligibleForNewCycle,
   type CycleComputation,
 } from "@/lib/services/petrol-cycle-logic";
-import { startOfAppDay } from "@/lib/timezone";
 import { vehicles } from "@/lib/db/schema";
 import * as schema from "@/lib/db/schema";
 
@@ -175,15 +175,16 @@ export async function recordPetrolTransaction(input: RecordPetrolInput) {
       timezone,
     );
 
-    if (
-      computation.status === "COMPLETED" &&
-      computation.nextEligibleAt &&
-      startOfAppDay(input.transactionAt, timezone).getTime() >=
-        computation.nextEligibleAt.getTime()
-    ) {
+    if (isEligibleForNewCycle(computation, input.transactionAt, timezone)) {
       await tx
         .update(petrolCycles)
-        .set({ status: "COMPLETED", version: cycle.version + 1, updatedAt: new Date() })
+        .set({
+          status: computation.status === "COMPLETED" ? "COMPLETED" : "SUPERSEDED",
+          completedAt: computation.completedAt,
+          nextEligibleAt: computation.nextEligibleAt,
+          version: cycle.version + 1,
+          updatedAt: new Date(),
+        })
         .where(and(eq(petrolCycles.id, cycle.id), eq(petrolCycles.version, cycle.version)));
 
       const nextNumber = await getNextCycleNumber(input.vehicleId, tx);
@@ -243,23 +244,16 @@ export async function recordPetrolTransaction(input: RecordPetrolInput) {
       timezone,
     );
 
-    if (updatedComputation.status === "COMPLETED") {
-      await tx
-        .update(petrolCycles)
-        .set({
-          status: "COMPLETED",
-          completedAt: updatedComputation.completedAt,
-          nextEligibleAt: updatedComputation.nextEligibleAt,
-          version: lockedCycle.version + 1,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(petrolCycles.id, lockedCycle.id), eq(petrolCycles.version, lockedCycle.version)));
-    } else {
-      await tx
-        .update(petrolCycles)
-        .set({ version: lockedCycle.version + 1, updatedAt: new Date() })
-        .where(and(eq(petrolCycles.id, lockedCycle.id), eq(petrolCycles.version, lockedCycle.version)));
-    }
+    await tx
+      .update(petrolCycles)
+      .set({
+        status: updatedComputation.status,
+        completedAt: updatedComputation.completedAt,
+        nextEligibleAt: updatedComputation.nextEligibleAt,
+        version: lockedCycle.version + 1,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(petrolCycles.id, lockedCycle.id), eq(petrolCycles.version, lockedCycle.version)));
 
     const [result] = await tx
       .select()
@@ -317,6 +311,19 @@ export async function getVehiclePetrolSummary(vehicleId: string, userId: string)
 
   const computation = await getCycleComputation(cycle);
   const now = new Date();
+
+  if (isEligibleForNewCycle(computation, now, timezone)) {
+    return {
+      allowedLitres,
+      totalTaken: 0,
+      remainingLitres: allowedLitres,
+      status: "OPEN" as const,
+      completedAt: null,
+      nextEligibleAt: null,
+      cycleNumber: cycle.cycleNumber + 1,
+      canTakePetrol: true,
+    };
+  }
 
   return {
     allowedLitres: cycle.allowedLitres,
