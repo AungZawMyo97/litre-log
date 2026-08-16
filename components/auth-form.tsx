@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { my } from "@/lib/i18n/my";
 
@@ -11,6 +11,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const busy = loading || isPending;
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -28,15 +30,17 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     });
 
     const data = await response.json();
-    setLoading(false);
-
     if (!response.ok) {
+      setLoading(false);
       setError(data.error ?? my.auth.genericError);
       return;
     }
 
-    router.push("/dashboard");
-    router.refresh();
+    setLoading(false);
+    startTransition(() => {
+      router.push("/dashboard");
+      router.refresh();
+    });
   }
 
   return (
@@ -47,7 +51,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4"
+            disabled={busy}
+            className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4 disabled:bg-[var(--surface)] disabled:opacity-75"
             placeholder={my.auth.optional}
           />
         </label>
@@ -60,7 +65,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4"
+          disabled={busy}
+          className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4 disabled:bg-[var(--surface)] disabled:opacity-75"
         />
       </label>
 
@@ -71,7 +77,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4"
+          disabled={busy}
+          className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4 disabled:bg-[var(--surface)] disabled:opacity-75"
         />
       </label>
 
@@ -79,10 +86,10 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={busy}
         className="min-h-12 w-full rounded-lg bg-[var(--accent)] px-4 py-3 font-bold text-white disabled:opacity-60"
       >
-        {loading ? my.common.pleaseWait : mode === "login" ? my.auth.signIn : my.auth.signUp}
+        {busy ? my.common.pleaseWait : mode === "login" ? my.auth.signIn : my.auth.signUp}
       </button>
     </form>
   );

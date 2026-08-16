@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { my } from "@/lib/i18n/my";
 
 const navItems = [
@@ -12,14 +14,31 @@ const navItems = [
   { href: "/notifications", label: my.nav.alerts, icon: "!" },
 ];
 
+function NavPendingDot() {
+  const { pending } = useLinkStatus();
+
+  return (
+    <span
+      aria-hidden="true"
+      className={`h-1.5 w-1.5 rounded-full bg-current transition-opacity ${pending ? "animate-pulse opacity-70" : "opacity-0"}`}
+    />
+  );
+}
+
 export function AppShell({ children, userName }: { children: React.ReactNode; userName?: string | null }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const busy = logoutLoading || isPending;
 
   async function logout() {
+    setLogoutLoading(true);
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
+    startTransition(() => {
+      router.push("/login");
+      router.refresh();
+    });
   }
 
   return (
@@ -35,9 +54,10 @@ export function AppShell({ children, userName }: { children: React.ReactNode; us
             <button
               type="button"
               onClick={logout}
-              className="min-h-11 rounded-lg border border-[var(--line)] bg-[var(--card)] px-3 text-sm font-semibold hover:border-[var(--accent)] sm:px-4 sm:text-base"
+              disabled={busy}
+              className="min-h-11 rounded-lg border border-[var(--line)] bg-[var(--card)] px-3 text-sm font-semibold hover:border-[var(--accent)] disabled:opacity-60 sm:px-4 sm:text-base"
             >
-              {my.common.logout}
+              {busy ? my.common.pleaseWait : my.common.logout}
             </button>
           </div>
         </div>
@@ -71,6 +91,7 @@ export function AppShell({ children, userName }: { children: React.ReactNode; us
                   {item.icon}
                 </span>
                 <span className="max-w-full truncate">{item.label}</span>
+                <NavPendingDot />
               </Link>
             );
           })}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { my } from "@/lib/i18n/my";
 
@@ -11,6 +11,8 @@ export function VehicleForm() {
   const [plateParity, setPlateParity] = useState<"" | "ODD" | "EVEN">("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const busy = loading || isPending;
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -41,7 +43,9 @@ export function VehicleForm() {
     setName("");
     setLicensePlate("");
     setPlateParity("");
-    router.refresh();
+    startTransition(() => {
+      router.refresh();
+    });
   }
 
   return (
@@ -53,8 +57,9 @@ export function VehicleForm() {
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
+          disabled={busy}
           placeholder={my.vehicle.nicknamePlaceholder}
-          className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4"
+          className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4 disabled:bg-[var(--surface)] disabled:opacity-75"
         />
       </label>
       <label className="block space-y-2">
@@ -63,8 +68,9 @@ export function VehicleForm() {
           required
           value={licensePlate}
           onChange={(e) => setLicensePlate(e.target.value)}
+          disabled={busy}
           placeholder={my.vehicle.platePlaceholder}
-          className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4"
+          className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4 disabled:bg-[var(--surface)] disabled:opacity-75"
         />
       </label>
       <label className="block space-y-2">
@@ -72,7 +78,8 @@ export function VehicleForm() {
         <select
           value={plateParity}
           onChange={(e) => setPlateParity(e.target.value as "" | "ODD" | "EVEN")}
-          className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4"
+          disabled={busy}
+          className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4 disabled:bg-[var(--surface)] disabled:opacity-75"
         >
           <option value="">{my.vehicle.autoDetectParity}</option>
           <option value="ODD">{my.vehicle.odd}</option>
@@ -82,10 +89,10 @@ export function VehicleForm() {
       {error ? <p className="text-sm text-[var(--bad)]">{error}</p> : null}
       <button
         type="submit"
-        disabled={loading}
+        disabled={busy}
         className="min-h-12 w-full rounded-lg bg-[var(--accent)] px-4 py-3 font-bold text-white disabled:opacity-60"
       >
-        {loading ? my.common.saving : my.vehicle.saveVehicle}
+        {busy ? my.common.saving : my.vehicle.saveVehicle}
       </button>
     </form>
   );

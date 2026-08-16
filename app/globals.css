@@ -17,6 +17,7 @@
   --bad-soft: #fee2e2;
   --warn-soft: #fff4cf;
   --focus: #315f93;
+  --skeleton: #e5eef7;
 }
 
 @theme inline {
