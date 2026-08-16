@@ -86,6 +86,7 @@ export const my = {
     drivingRestricted: "မောင်းခွင့်မရှိ",
     petrolAvailable: "ဆီယူနိုင်သည်",
     cycleIncomplete: "ဆီယူရန် ကျန်ရှိ",
+    today: "ယနေ့",
   },
   notifications: {
     title: "အကြောင်းကြားချက်များ",

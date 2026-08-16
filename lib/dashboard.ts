@@ -3,7 +3,10 @@ import { db, vehicles } from "@/lib/db";
 import { getVehiclePetrolSummary } from "@/lib/services/petrol-cycle-service";
 import { syncDailyNotifications } from "@/lib/services/notification-service";
 import { getAppTimezone } from "@/lib/settings";
-import { isDrivingAllowedForParity } from "@/lib/services/vehicle-restriction-service";
+import {
+  isDrivingAllowedForParity,
+  getNextDrivingAllowedDay,
+} from "@/lib/services/vehicle-restriction-service";
 import type { VehicleCardData } from "@/components/vehicle-card";
 
 export async function getDashboardVehicles(userId: string): Promise<VehicleCardData[]> {
@@ -20,6 +23,9 @@ export async function getDashboardVehicles(userId: string): Promise<VehicleCardD
   return Promise.all(
     rows.map(async (vehicle) => {
       const summary = await getVehiclePetrolSummary(vehicle.id, userId);
+      const adjustedNextEligibleAt = summary.nextEligibleAt
+        ? getNextDrivingAllowedDay(summary.nextEligibleAt, vehicle.plateParity, timezone)
+        : null;
       return {
         id: vehicle.id,
         name: vehicle.name,
@@ -31,7 +37,7 @@ export async function getDashboardVehicles(userId: string): Promise<VehicleCardD
         remainingLitres: summary.remainingLitres,
         status: summary.status,
         completedAt: summary.completedAt,
-        nextEligibleAt: summary.nextEligibleAt,
+        nextEligibleAt: adjustedNextEligibleAt,
         canTakePetrol: summary.canTakePetrol,
       };
     }),

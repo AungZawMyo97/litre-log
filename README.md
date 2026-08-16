@@ -15,7 +15,6 @@ Myanmar vehicle petrol cycle and odd/even driving-day tracker. Litre Log is also
 npm install
 cp .env.example .env   # add your Neon DATABASE_URL and AUTH_SECRET
 npm run db:push
-npm run db:seed
 npm run dev
 ```
 
@@ -27,9 +26,6 @@ Open `http://localhost:3000` during development. For phone installation, deploy 
 |---|---|
 | `npm run dev` | Start development server |
 | `npm run db:push` | Push schema to Neon |
-| `npm run db:generate` | Generate SQL migrations |
-| `npm run db:migrate` | Apply migrations |
-| `npm run db:seed` | Seed default system settings |
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm run lint` | Run ESLint |
 | `npm run build` | Create a production build |

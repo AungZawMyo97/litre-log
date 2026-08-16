@@ -46,12 +46,11 @@ const transactionSchema = z.object({
 });
 
 export async function POST(request: Request, context: RouteContext) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: my.errors.unauthorized }, { status: 401 });
-
-  const { id } = await context.params;
-
   try {
+    const user = await getSessionUser();
+    if (!user) return NextResponse.json({ error: my.errors.unauthorized }, { status: 401 });
+
+    const { id } = await context.params;
     const body = transactionSchema.parse(await request.json());
     const timezone = await getAppTimezone();
     const transactionAt = body.transactionAt.includes("T")

@@ -4,9 +4,13 @@ import { db, petrolCycles, vehicles } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { my } from "@/lib/i18n/my";
 import { getVehiclePetrolSummary } from "@/lib/services/petrol-cycle-service";
-import { buildCalendarDayStatus } from "@/lib/services/vehicle-restriction-service";
+import {
+  buildCalendarDayStatus,
+  getNextDrivingAllowedDay,
+  isDrivingAllowedForParity,
+} from "@/lib/services/vehicle-restriction-service";
 import { getAppTimezone } from "@/lib/settings";
-import { startOfAppDay, addAppDays } from "@/lib/timezone";
+import { startOfAppDay, addAppDays, isSameAppDay } from "@/lib/timezone";
 import { eachDayOfInterval, endOfMonth, startOfMonth } from "date-fns";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -33,6 +37,7 @@ export async function GET(request: Request, context: RouteContext) {
   const anchor = monthParam ? new Date(`${monthParam}-01T12:00:00+06:30`) : new Date();
   const rangeStart = startOfMonth(anchor);
   const rangeEnd = endOfMonth(anchor);
+  const today = startOfAppDay(new Date(), timezone);
 
   const summary = await getVehiclePetrolSummary(id, user.id);
   const cycles = await db.select().from(petrolCycles).where(eq(petrolCycles.vehicleId, id));
@@ -46,24 +51,25 @@ export async function GET(request: Request, context: RouteContext) {
         startOfAppDay(cycle.completedAt, timezone).getTime() === appDay.getTime(),
     );
 
-    const incompleteOnDay =
-      summary.status === "OPEN" &&
-      summary.remainingLitres > 0 &&
-      appDay.getTime() === startOfAppDay(new Date(), timezone).getTime();
+    const rawNextEligibleDay = summary.nextEligibleAt
+      ? startOfAppDay(summary.nextEligibleAt, timezone)
+      : null;
+
+    const nextEligibleDay = rawNextEligibleDay
+      ? getNextDrivingAllowedDay(rawNextEligibleDay, vehicle.plateParity, timezone)
+      : null;
 
     const refillAvailable =
-      summary.nextEligibleAt !== null &&
-      appDay.getTime() === startOfAppDay(summary.nextEligibleAt, timezone).getTime();
+      nextEligibleDay !== null &&
+      appDay.getTime() >= nextEligibleDay.getTime() &&
+      isDrivingAllowedForParity(vehicle.plateParity, appDay, timezone);
 
-    const eligibleWindow =
-      summary.status === "COMPLETED" &&
-      summary.nextEligibleAt &&
-      appDay.getTime() >= startOfAppDay(summary.nextEligibleAt, timezone).getTime();
+    const isToday = isSameAppDay(appDay, today, timezone);
 
     return buildCalendarDayStatus(vehicle.plateParity, appDay, {
       timezone,
-      petrolRefillAvailable: refillAvailable || Boolean(eligibleWindow),
-      petrolCycleIncomplete: incompleteOnDay,
+      petrolRefillAvailable: refillAvailable,
+      petrolCycleIncomplete: isToday && summary.status === "OPEN" && summary.remainingLitres > 0,
       petrolCycleCompleted: completedOnDay,
     });
   });

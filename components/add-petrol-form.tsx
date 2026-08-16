@@ -16,25 +16,36 @@ export function AddPetrolForm({ vehicleId }: { vehicleId: string }) {
     setLoading(true);
     setError(null);
 
-    const response = await fetch(`/api/vehicles/${vehicleId}/petrol`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        litres: Number(litres),
-        transactionAt: date,
-      }),
-    });
+    try {
+      const response = await fetch(`/api/vehicles/${vehicleId}/petrol`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          litres: Number(litres),
+          transactionAt: date,
+        }),
+      });
 
-    const data = await response.json();
-    setLoading(false);
+      let data: Record<string, unknown>;
+      try {
+        data = await response.json();
+      } catch {
+        setError(my.errors.recordPetrolFailed);
+        return;
+      }
 
-    if (!response.ok) {
-      setError(data.error ?? my.errors.recordPetrolFailed);
-      return;
+      if (!response.ok) {
+        setError((data.error as string) ?? my.errors.recordPetrolFailed);
+        return;
+      }
+
+      setLitres("");
+      router.refresh();
+    } catch {
+      setError(my.errors.recordPetrolFailed);
+    } finally {
+      setLoading(false);
     }
-
-    setLitres("");
-    router.refresh();
   }
 
   return (

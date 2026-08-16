@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { registerUser, createSession } from "@/lib/auth";
 import { my } from "@/lib/i18n/my";
-import { seedDefaultSettings } from "@/lib/settings";
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -13,7 +12,6 @@ const registerSchema = z.object({
 export async function POST(request: Request) {
   try {
     const body = registerSchema.parse(await request.json());
-    await seedDefaultSettings();
     const user = await registerUser(body);
     await createSession(user);
     return NextResponse.json({ user }, { status: 201 });

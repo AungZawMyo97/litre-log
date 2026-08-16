@@ -1,6 +1,6 @@
 import { getDaysInMonth } from "date-fns";
 import type { PlateParity } from "@/lib/db";
-import { getAppDayOfMonth, toAppDate } from "@/lib/timezone";
+import { addAppDays, getAppDayOfMonth, startOfAppDay, toAppDate } from "@/lib/timezone";
 
 export function isOddDay(day: number): boolean {
   return day % 2 === 1;
@@ -10,6 +10,15 @@ export function isDrivingAllowedForParity(parity: PlateParity, date: Date, timez
   const day = getAppDayOfMonth(date, timezone);
   const dayIsOdd = isOddDay(day);
   return parity === "ODD" ? dayIsOdd : !dayIsOdd;
+}
+
+export function getNextDrivingAllowedDay(from: Date, parity: PlateParity, timezone?: string): Date {
+  let day = startOfAppDay(from, timezone);
+  for (let i = 0; i < 7; i++) {
+    if (isDrivingAllowedForParity(parity, day, timezone)) return day;
+    day = addAppDays(day, 1, timezone);
+  }
+  return day;
 }
 
 export function getDrivingDaysInMonth(

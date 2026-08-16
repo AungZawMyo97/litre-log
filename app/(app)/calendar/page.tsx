@@ -2,9 +2,13 @@ import { and, asc, eq } from "drizzle-orm";
 import { db, petrolCycles, vehicles } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { getVehiclePetrolSummary } from "@/lib/services/petrol-cycle-service";
-import { buildCalendarDayStatus } from "@/lib/services/vehicle-restriction-service";
+import {
+  buildCalendarDayStatus,
+  getNextDrivingAllowedDay,
+  isDrivingAllowedForParity,
+} from "@/lib/services/vehicle-restriction-service";
 import { getAppTimezone } from "@/lib/settings";
-import { formatAppMonthYear, startOfAppDay } from "@/lib/timezone";
+import { formatAppMonthYear, startOfAppDay, isSameAppDay } from "@/lib/timezone";
 import { my } from "@/lib/i18n/my";
 import { eachDayOfInterval, endOfMonth, startOfMonth } from "date-fns";
 
@@ -22,6 +26,7 @@ export default async function CalendarPage() {
   const anchor = new Date();
   const rangeStart = startOfMonth(anchor);
   const rangeEnd = endOfMonth(anchor);
+  const today = startOfAppDay(new Date(), timezone);
 
   const vehicleCalendars = await Promise.all(
     userVehicles.map(async (vehicle) => {
@@ -36,14 +41,25 @@ export default async function CalendarPage() {
             startOfAppDay(cycle.completedAt, timezone).getTime() === appDay.getTime(),
         );
 
+        const rawNextEligibleDay = summary.nextEligibleAt
+          ? startOfAppDay(summary.nextEligibleAt, timezone)
+          : null;
+
+        const nextEligibleDay = rawNextEligibleDay
+          ? getNextDrivingAllowedDay(rawNextEligibleDay, vehicle.plateParity, timezone)
+          : null;
+
         const refillAvailable =
-          summary.nextEligibleAt !== null &&
-          appDay.getTime() >= startOfAppDay(summary.nextEligibleAt, timezone).getTime();
+          nextEligibleDay !== null &&
+          appDay.getTime() >= nextEligibleDay.getTime() &&
+          isDrivingAllowedForParity(vehicle.plateParity, appDay, timezone);
+
+        const isToday = isSameAppDay(appDay, today, timezone);
 
         return buildCalendarDayStatus(vehicle.plateParity, appDay, {
           timezone,
           petrolRefillAvailable: refillAvailable,
-          petrolCycleIncomplete: summary.status === "OPEN" && summary.remainingLitres > 0,
+          petrolCycleIncomplete: isToday && summary.status === "OPEN" && summary.remainingLitres > 0,
           petrolCycleCompleted: completedOnDay,
         });
       });
@@ -61,14 +77,17 @@ export default async function CalendarPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
         <span className="rounded-lg bg-[var(--ok-soft)] px-3 py-2 font-semibold">{my.calendar.drivingAllowed}</span>
         <span className="rounded-lg bg-[var(--bad-soft)] px-3 py-2 font-semibold">{my.calendar.drivingRestricted}</span>
-        <span className="rounded-lg border-2 border-[var(--accent)] bg-[var(--card)] px-3 py-2 font-semibold">
+        <span className="rounded-lg border-2 border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-2 font-semibold">
           {my.calendar.petrolAvailable}
         </span>
         <span className="rounded-lg border-2 border-dashed border-[var(--accent)] bg-[var(--card)] px-3 py-2 font-semibold">
           {my.calendar.cycleIncomplete}
+        </span>
+        <span className="rounded-lg border-2 border-[var(--ink)] bg-[var(--card)] px-3 py-2 font-semibold">
+          {my.calendar.today}
         </span>
       </div>
 
@@ -80,18 +99,20 @@ export default async function CalendarPage() {
           <div className="grid grid-cols-7 gap-1">
             {days.map((day) => {
               const dayNum = day.date.getDate();
+              const isToday = isSameAppDay(day.date, today, timezone);
               const tone = day.drivingAllowed ? "bg-[var(--ok-soft)]" : "bg-[var(--bad-soft)]";
               const petrolTone = day.petrolRefillAvailable
-                ? "border-[var(--accent)]"
+                ? "bg-[var(--accent-soft)] border-[var(--accent)]"
                 : day.petrolCycleIncomplete
                   ? "border-dashed border-[var(--accent)]"
                   : "border-transparent";
               const completionTone = day.petrolCycleCompleted ? "ring-2 ring-[var(--accent)]" : "";
+              const todayTone = isToday ? "ring-2 ring-[var(--ink)]" : "";
 
               return (
                 <div
                   key={day.date.toISOString()}
-                  className={`min-h-11 rounded-lg border-2 p-2 text-center text-sm font-bold ${tone} ${petrolTone} ${completionTone}`}
+                  className={`min-h-11 rounded-lg border-2 p-2 text-center text-sm font-bold ${tone} ${petrolTone} ${completionTone} ${todayTone}`}
                 >
                   {dayNum}
                 </div>
