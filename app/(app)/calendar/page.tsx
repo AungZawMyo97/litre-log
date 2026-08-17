@@ -8,9 +8,8 @@ import {
   isDrivingAllowedForParity,
 } from "@/lib/services/vehicle-restriction-service";
 import { getAppTimezone } from "@/lib/settings";
-import { formatAppMonthYear, startOfAppDay, isSameAppDay } from "@/lib/timezone";
+import { formatAppMonthYear, getAppDayOfMonth, getAppMonthDays, startOfAppDay, isSameAppDay } from "@/lib/timezone";
 import { my } from "@/lib/i18n/my";
-import { eachDayOfInterval, endOfMonth, startOfMonth } from "date-fns";
 
 export default async function CalendarPage() {
   const user = await getSessionUser();
@@ -24,8 +23,7 @@ export default async function CalendarPage() {
 
   const timezone = await getAppTimezone();
   const anchor = new Date();
-  const rangeStart = startOfMonth(anchor);
-  const rangeEnd = endOfMonth(anchor);
+  const monthDays = getAppMonthDays(anchor, timezone);
   const today = startOfAppDay(new Date(), timezone);
 
   const vehicleCalendars = await Promise.all(
@@ -33,7 +31,7 @@ export default async function CalendarPage() {
       const summary = await getVehiclePetrolSummary(vehicle.id, user.id);
       const cycles = await db.select().from(petrolCycles).where(eq(petrolCycles.vehicleId, vehicle.id));
 
-      const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd }).map((date) => {
+      const days = monthDays.map((date) => {
         const appDay = startOfAppDay(date, timezone);
         const completedOnDay = cycles.some(
           (cycle) =>
@@ -98,7 +96,7 @@ export default async function CalendarPage() {
           </h2>
           <div className="grid grid-cols-7 gap-1">
             {days.map((day) => {
-              const dayNum = day.date.getDate();
+              const dayNum = getAppDayOfMonth(day.date, timezone);
               const isToday = isSameAppDay(day.date, today, timezone);
               const tone = day.drivingAllowed ? "bg-[var(--ok-soft)]" : "bg-[var(--bad-soft)]";
               const petrolTone = day.petrolRefillAvailable

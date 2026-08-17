@@ -1,4 +1,5 @@
 import { formatInTimeZone, toZonedTime, fromZonedTime } from "date-fns-tz";
+import { getDaysInMonth } from "date-fns";
 
 export const APP_TIMEZONE = "Asia/Yangon";
 
@@ -21,6 +22,10 @@ export function addAppDays(date: Date, days: number, timezone = APP_TIMEZONE): D
 
 export function formatAppDate(date: Date, timezone = APP_TIMEZONE): string {
   return formatInTimeZone(date, timezone, "d MMM yyyy");
+}
+
+export function formatAppDateInput(date: Date, timezone = APP_TIMEZONE): string {
+  return formatInTimeZone(date, timezone, "yyyy-MM-dd");
 }
 
 export function formatAppDateTime(date: Date, timezone = APP_TIMEZONE): string {
@@ -47,4 +52,15 @@ export function parseAppDateInput(value: string, timezone = APP_TIMEZONE): Date 
   const [year, month, day] = value.split("-").map(Number);
   const local = new Date(year, month - 1, day, 12, 0, 0, 0);
   return fromZonedTime(local, timezone);
+}
+
+export function getAppMonthDays(anchor: Date, timezone = APP_TIMEZONE): Date[] {
+  const zoned = toZonedTime(anchor, timezone);
+  const year = zoned.getFullYear();
+  const month = zoned.getMonth();
+  const daysInMonth = getDaysInMonth(new Date(year, month, 1));
+
+  return Array.from({ length: daysInMonth }, (_, index) =>
+    fromZonedTime(new Date(year, month, index + 1, 12, 0, 0, 0), timezone),
+  );
 }

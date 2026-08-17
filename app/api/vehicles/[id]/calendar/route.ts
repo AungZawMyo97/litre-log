@@ -10,8 +10,7 @@ import {
   isDrivingAllowedForParity,
 } from "@/lib/services/vehicle-restriction-service";
 import { getAppTimezone } from "@/lib/settings";
-import { startOfAppDay, addAppDays, isSameAppDay } from "@/lib/timezone";
-import { eachDayOfInterval, endOfMonth, startOfMonth } from "date-fns";
+import { startOfAppDay, addAppDays, getAppMonthDays, parseAppDateInput, isSameAppDay } from "@/lib/timezone";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -34,15 +33,16 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   const timezone = await getAppTimezone();
-  const anchor = monthParam ? new Date(`${monthParam}-01T12:00:00+06:30`) : new Date();
-  const rangeStart = startOfMonth(anchor);
-  const rangeEnd = endOfMonth(anchor);
+  const anchor = monthParam ? parseAppDateInput(`${monthParam}-01`, timezone) : new Date();
+  const monthDays = getAppMonthDays(anchor, timezone);
+  const rangeStart = startOfAppDay(monthDays[0] ?? anchor, timezone);
+  const rangeEnd = startOfAppDay(monthDays[monthDays.length - 1] ?? anchor, timezone);
   const today = startOfAppDay(new Date(), timezone);
 
   const summary = await getVehiclePetrolSummary(id, user.id);
   const cycles = await db.select().from(petrolCycles).where(eq(petrolCycles.vehicleId, id));
 
-  const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd }).map((date) => {
+  const days = monthDays.map((date) => {
     const appDay = startOfAppDay(date, timezone);
 
     const completedOnDay = cycles.some(

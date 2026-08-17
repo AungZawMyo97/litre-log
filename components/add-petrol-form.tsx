@@ -3,11 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { my } from "@/lib/i18n/my";
+import { formatAppDateInput } from "@/lib/timezone";
 
 export function AddPetrolForm({ vehicleId }: { vehicleId: string }) {
   const router = useRouter();
   const [litres, setLitres] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => formatAppDateInput(new Date()));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isPending, startTransition] = useTransition();

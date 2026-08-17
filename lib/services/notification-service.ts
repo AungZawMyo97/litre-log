@@ -67,7 +67,8 @@ async function upsertNotification(input: {
   title: string;
   message: string;
 }) {
-  const dayStart = startOfAppDay(new Date());
+  const timezone = await getAppTimezone();
+  const dayStart = startOfAppDay(new Date(), timezone);
 
   const [existing] = await db
     .select()
