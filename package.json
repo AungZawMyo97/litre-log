@@ -7,9 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run",
+    "test": "vitest run tests/business-rules.test.ts",
+    "test:unit": "vitest run tests/business-rules.test.ts",
+    "test:integration": "vitest run tests/security.test.ts",
     "test:watch": "vitest",
     "db:push": "drizzle-kit push",
+    "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

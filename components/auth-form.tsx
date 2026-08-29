@@ -23,28 +23,31 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     const payload =
       mode === "login" ? { email, password } : { email, password, name: name || undefined };
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error ?? my.auth.genericError);
+        return;
+      }
 
-    const data = await response.json();
-    if (!response.ok) {
+      startTransition(() => {
+        router.push("/dashboard");
+        router.refresh();
+      });
+    } catch {
+      setError(my.auth.genericError);
+    } finally {
       setLoading(false);
-      setError(data.error ?? my.auth.genericError);
-      return;
     }
-
-    setLoading(false);
-    startTransition(() => {
-      router.push("/dashboard");
-      router.refresh();
-    });
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-5">
       {mode === "register" ? (
         <label className="block space-y-2">
           <span className="font-semibold">{my.auth.name}</span>
@@ -52,7 +55,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             disabled={busy}
-            className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4 disabled:bg-[var(--surface)] disabled:opacity-75"
+            className="min-h-14 w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 text-lg shadow-sm disabled:bg-[var(--surface)] disabled:opacity-75"
             placeholder={my.auth.optional}
           />
         </label>
@@ -66,7 +69,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={busy}
-          className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4 disabled:bg-[var(--surface)] disabled:opacity-75"
+          className="min-h-14 w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 text-lg shadow-sm disabled:bg-[var(--surface)] disabled:opacity-75"
         />
       </label>
 
@@ -78,16 +81,16 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           disabled={busy}
-          className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4 disabled:bg-[var(--surface)] disabled:opacity-75"
+          className="min-h-14 w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 text-lg shadow-sm disabled:bg-[var(--surface)] disabled:opacity-75"
         />
       </label>
 
-      {error ? <p className="text-sm text-[var(--bad)]">{error}</p> : null}
+      {error ? <p role="alert" className="rounded-xl bg-[var(--bad-soft)] p-3 font-semibold text-[var(--bad)]">{error}</p> : null}
 
       <button
         type="submit"
         disabled={busy}
-        className="min-h-12 w-full rounded-lg bg-[var(--accent)] px-4 py-3 font-bold text-white disabled:opacity-60"
+        className="min-h-14 w-full rounded-xl bg-[var(--accent)] px-5 py-3 font-bold text-white shadow-sm hover:bg-[var(--accent-hover)] disabled:opacity-60"
       >
         {busy ? my.common.pleaseWait : mode === "login" ? my.auth.signIn : my.auth.signUp}
       </button>

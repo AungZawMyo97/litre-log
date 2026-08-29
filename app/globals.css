@@ -1,23 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  --surface: #f7fbff;
+  --surface: #f4f7fa;
   --card: #ffffff;
-  --ink: #16283a;
-  --muted: #5d7086;
-  --line: #d8e4f0;
-  --hero: #173e69;
-  --accent: #315f93;
-  --accent-soft: #dcecff;
-  --nav: #14365f;
-  --nav-soft: #eaf3ff;
-  --ok: #0f766e;
-  --ok-soft: #d7f8ed;
-  --bad: #b91c1c;
-  --bad-soft: #fee2e2;
-  --warn-soft: #fff4cf;
-  --focus: #315f93;
-  --skeleton: #e5eef7;
+  --ink: #172536;
+  --muted: #526477;
+  --line: #cbd7e3;
+  --line-strong: #aebdcb;
+  --hero: #183b5b;
+  --accent: #285f8f;
+  --accent-hover: #1e4c75;
+  --accent-soft: #e3eff8;
+  --nav: #163752;
+  --nav-soft: #e7f0f7;
+  --ok: #176a55;
+  --ok-soft: #e2f3ec;
+  --bad: #a73737;
+  --bad-soft: #fae8e8;
+  --warn-soft: #fff3cf;
+  --focus: #1d659d;
+  --skeleton: #e2eaf1;
+  --shadow-card: 0 1px 2px rgba(20, 42, 63, 0.05), 0 10px 28px rgba(20, 42, 63, 0.07);
 }
 
 @theme inline {
@@ -31,8 +34,8 @@ body {
   background: var(--surface);
   color: var(--ink);
   font-family: var(--font-body), sans-serif;
-  font-size: 16px;
-  line-height: 1.65;
+  font-size: 17px;
+  line-height: 1.7;
   overflow-x: hidden;
   overscroll-behavior-y: none;
 }
@@ -47,9 +50,53 @@ select {
   font: inherit;
 }
 
+button,
+a,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a {
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease,
+    box-shadow 160ms ease, transform 160ms ease;
+}
+
+button:not(:disabled):active,
+a:active {
+  transform: translateY(1px);
+}
+
+input,
+select {
+  color: var(--ink);
+}
+
+input::placeholder {
+  color: #718196;
+  opacity: 1;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--hero);
+}
+
 :focus-visible {
   outline: 3px solid var(--focus);
-  outline-offset: 3px;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 .mobile-bottom-nav {

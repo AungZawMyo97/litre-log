@@ -1,51 +1,39 @@
+import { and, desc, eq } from "drizzle-orm";
+import { db, petrolCycles, petrolTransactions, type PetrolTransaction } from "@/lib/db";
 import { my } from "@/lib/i18n/my";
-import { and, asc, desc, eq, inArray, type ExtractTablesWithRelations } from "drizzle-orm";
-import type { NeonQueryResultHKT } from "drizzle-orm/neon-serverless";
-import type { PgTransaction } from "drizzle-orm/pg-core";
+import { getAppTimezone, getNumericSetting } from "@/lib/settings";
 import {
-  db,
-  petrolCycles,
-  petrolTransactions,
-  type PetrolCycle,
-  type PetrolTransaction,
-} from "@/lib/db";
-import { getNumericSetting, getAppTimezone } from "@/lib/settings";
-import {
-  computeCycleState,
-  validateTransactionLitres,
   canRecordTransaction,
+  computeCycleState,
   isEligibleForNewCycle,
   type CycleComputation,
+  validateTransactionLitres,
 } from "@/lib/services/petrol-cycle-logic";
-import { vehicles } from "@/lib/db/schema";
-import * as schema from "@/lib/db/schema";
-
-type DbClient = typeof db;
-type TxClient = PgTransaction<NeonQueryResultHKT, typeof schema, ExtractTablesWithRelations<typeof schema>>;
+import {
+  findCurrentCycle,
+  findOwnedActiveVehicle,
+  getNextCycleNumber,
+  loadCycleTransactions,
+  loadCycleWithTransactions,
+  lockOwnedActiveVehicle,
+  type CycleWithTransactions,
+} from "@/lib/services/petrol-cycle-repository";
+import type { VehiclePetrolSummary } from "@/lib/services/petrol-summary";
+import {
+  getNextDrivingAllowedDay,
+  isDrivingAllowedForParity,
+} from "@/lib/services/vehicle-restriction-service";
+import { isFutureAppDay, startOfAppDay } from "@/lib/timezone";
 
 export class PetrolCycleError extends Error {
   constructor(
     message: string,
     public statusCode = 400,
+    public code = "PETROL_CYCLE_ERROR",
   ) {
     super(message);
     this.name = "PetrolCycleError";
   }
-}
-
-type CycleWithTransactions = PetrolCycle & { transactions: PetrolTransaction[] };
-
-async function getVehicleForUser(vehicleId: string, userId: string) {
-  const [vehicle] = await db
-    .select()
-    .from(vehicles)
-    .where(and(eq(vehicles.id, vehicleId), eq(vehicles.userId, userId), eq(vehicles.isActive, true)))
-    .limit(1);
-
-  if (!vehicle) {
-    throw new PetrolCycleError(my.errors.vehicleNotFound, 404);
-  }
-  return vehicle;
 }
 
 async function getAllocationAndInterval() {
@@ -58,59 +46,40 @@ async function getAllocationAndInterval() {
 }
 
 function mapTransactions(transactions: PetrolTransaction[]) {
-  return transactions.map((tx) => ({
-    litres: tx.litres,
-    transactionAt: tx.transactionAt,
+  return transactions.map((transaction) => ({
+    litres: transaction.litres,
+    transactionAt: transaction.transactionAt,
   }));
 }
 
-async function loadCycleTransactions(
-  cycleId: string,
-  client: DbClient | TxClient = db,
-): Promise<PetrolTransaction[]> {
-  return client
-    .select()
-    .from(petrolTransactions)
-    .where(eq(petrolTransactions.cycleId, cycleId))
-    .orderBy(asc(petrolTransactions.transactionAt));
-}
-
-async function loadCycleWithTransactions(
-  cycle: PetrolCycle,
-  client: DbClient | TxClient = db,
-): Promise<CycleWithTransactions> {
-  const transactions = await loadCycleTransactions(cycle.id, client);
-  return { ...cycle, transactions };
-}
-
-async function getNextCycleNumber(vehicleId: string, client: DbClient | TxClient = db): Promise<number> {
-  const [latest] = await client
-    .select({ cycleNumber: petrolCycles.cycleNumber })
-    .from(petrolCycles)
-    .where(eq(petrolCycles.vehicleId, vehicleId))
-    .orderBy(desc(petrolCycles.cycleNumber))
-    .limit(1);
-
-  return (latest?.cycleNumber ?? 0) + 1;
+function assertTransactionDate(
+  transactionAt: Date,
+  asOf: Date,
+  timezone: string,
+  cycleStartedAt?: Date | null,
+) {
+  if (!Number.isFinite(transactionAt.getTime())) {
+    throw new PetrolCycleError(my.errors.invalidRefillDate, 400, "INVALID_REFILL_DATE");
+  }
+  if (isFutureAppDay(transactionAt, asOf, timezone)) {
+    throw new PetrolCycleError(my.errors.futureRefillDate, 422, "FUTURE_REFILL_DATE");
+  }
+  if (
+    cycleStartedAt &&
+    startOfAppDay(transactionAt, timezone).getTime() <
+      startOfAppDay(cycleStartedAt, timezone).getTime()
+  ) {
+    throw new PetrolCycleError(my.errors.refillBeforeCycle, 422, "REFILL_BEFORE_CYCLE");
+  }
 }
 
 export async function getCurrentCycle(vehicleId: string, userId: string) {
-  await getVehicleForUser(vehicleId, userId);
-
-  const [cycle] = await db
-    .select()
-    .from(petrolCycles)
-    .where(
-      and(
-        eq(petrolCycles.vehicleId, vehicleId),
-        inArray(petrolCycles.status, ["OPEN", "COMPLETED"]),
-      ),
-    )
-    .orderBy(desc(petrolCycles.cycleNumber))
-    .limit(1);
-
-  if (!cycle) return null;
-  return loadCycleWithTransactions(cycle);
+  const vehicle = await findOwnedActiveVehicle(vehicleId, userId);
+  if (!vehicle) {
+    throw new PetrolCycleError(my.errors.vehicleNotFound, 404, "VEHICLE_NOT_FOUND");
+  }
+  const cycle = await findCurrentCycle(vehicleId);
+  return cycle ? loadCycleWithTransactions(cycle) : null;
 }
 
 export async function getCycleComputation(cycle: CycleWithTransactions): Promise<CycleComputation> {
@@ -135,30 +104,26 @@ export type RecordPetrolInput = {
 
 export async function recordPetrolTransaction(input: RecordPetrolInput) {
   const { allowedLitres, cycleIntervalDays, timezone } = await getAllocationAndInterval();
+  const asOf = new Date();
+  assertTransactionDate(input.transactionAt, asOf, timezone);
 
   return db.transaction(async (tx) => {
-    await getVehicleForUser(input.vehicleId, input.userId);
+    const vehicle = await lockOwnedActiveVehicle(input.vehicleId, input.userId, tx);
+    if (!vehicle) {
+      throw new PetrolCycleError(my.errors.vehicleNotFound, 404, "VEHICLE_NOT_FOUND");
+    }
+    if (!isDrivingAllowedForParity(vehicle.plateParity, input.transactionAt, timezone)) {
+      throw new PetrolCycleError(my.errors.drivingRestrictedRefill, 422, "DRIVING_RESTRICTED");
+    }
 
-    const [existingCycle] = await tx
-      .select()
-      .from(petrolCycles)
-      .where(
-        and(
-          eq(petrolCycles.vehicleId, input.vehicleId),
-          inArray(petrolCycles.status, ["OPEN", "COMPLETED"]),
-        ),
-      )
-      .orderBy(desc(petrolCycles.cycleNumber))
-      .limit(1);
-
+    const existingCycle = await findCurrentCycle(input.vehicleId, tx);
     let cycle: CycleWithTransactions;
-
     if (!existingCycle) {
       const [created] = await tx
         .insert(petrolCycles)
         .values({
           vehicleId: input.vehicleId,
-          cycleNumber: 1,
+          cycleNumber: await getNextCycleNumber(input.vehicleId, tx),
           allowedLitres,
           status: "OPEN",
         })
@@ -174,9 +139,10 @@ export async function recordPetrolTransaction(input: RecordPetrolInput) {
       cycleIntervalDays,
       timezone,
     );
+    assertTransactionDate(input.transactionAt, asOf, timezone, computation.cycleStartedAt);
 
     if (isEligibleForNewCycle(computation, input.transactionAt, timezone)) {
-      await tx
+      const [closed] = await tx
         .update(petrolCycles)
         .set({
           status: computation.status === "COMPLETED" ? "COMPLETED" : "SUPERSEDED",
@@ -185,105 +151,88 @@ export async function recordPetrolTransaction(input: RecordPetrolInput) {
           version: cycle.version + 1,
           updatedAt: new Date(),
         })
-        .where(and(eq(petrolCycles.id, cycle.id), eq(petrolCycles.version, cycle.version)));
-
-      const nextNumber = await getNextCycleNumber(input.vehicleId, tx);
+        .where(and(eq(petrolCycles.id, cycle.id), eq(petrolCycles.version, cycle.version)))
+        .returning({ id: petrolCycles.id });
+      if (!closed) {
+        throw new PetrolCycleError(my.errors.concurrentUpdate, 409, "CONCURRENT_UPDATE");
+      }
 
       const [created] = await tx
         .insert(petrolCycles)
         .values({
           vehicleId: input.vehicleId,
-          cycleNumber: nextNumber,
+          cycleNumber: await getNextCycleNumber(input.vehicleId, tx),
           allowedLitres,
           status: "OPEN",
         })
         .returning();
-
       cycle = { ...created, transactions: [] };
       computation = computeCycleState(cycle.allowedLitres, [], cycleIntervalDays, timezone);
     }
 
     if (!canRecordTransaction(computation, input.transactionAt, timezone)) {
-      throw new PetrolCycleError(my.errors.notEligiblePetrol);
+      throw new PetrolCycleError(my.errors.notEligiblePetrol, 422, "NOT_ELIGIBLE");
     }
-
     const validation = validateTransactionLitres(input.litres, computation.remainingLitres);
     if (!validation.valid) {
-      throw new PetrolCycleError(validation.message);
-    }
-
-    const [lockedCycle] = await tx
-      .select()
-      .from(petrolCycles)
-      .where(eq(petrolCycles.id, cycle.id))
-      .limit(1);
-
-    if (!lockedCycle) {
-      throw new PetrolCycleError(my.errors.cycleNotFound, 404);
+      throw new PetrolCycleError(validation.message, 422, "INVALID_LITRES");
     }
 
     await tx.insert(petrolTransactions).values({
-      cycleId: lockedCycle.id,
+      cycleId: cycle.id,
       litres: input.litres,
       transactionAt: input.transactionAt,
-      station: input.station,
-      receiptRef: input.receiptRef,
-      notes: input.notes,
+      station: input.station?.trim() || null,
+      receiptRef: input.receiptRef?.trim() || null,
+      notes: input.notes?.trim() || null,
     });
 
-    const updatedTransactions = await tx
-      .select()
-      .from(petrolTransactions)
-      .where(eq(petrolTransactions.cycleId, lockedCycle.id))
-      .orderBy(asc(petrolTransactions.transactionAt));
-
+    const updatedTransactions = await loadCycleTransactions(cycle.id, tx);
     const updatedComputation = computeCycleState(
-      lockedCycle.allowedLitres,
+      cycle.allowedLitres,
       mapTransactions(updatedTransactions),
       cycleIntervalDays,
       timezone,
     );
-
-    await tx
+    const [updatedCycle] = await tx
       .update(petrolCycles)
       .set({
         status: updatedComputation.status,
         completedAt: updatedComputation.completedAt,
         nextEligibleAt: updatedComputation.nextEligibleAt,
-        version: lockedCycle.version + 1,
+        version: cycle.version + 1,
         updatedAt: new Date(),
       })
-      .where(and(eq(petrolCycles.id, lockedCycle.id), eq(petrolCycles.version, lockedCycle.version)));
+      .where(and(eq(petrolCycles.id, cycle.id), eq(petrolCycles.version, cycle.version)))
+      .returning();
+    if (!updatedCycle) {
+      throw new PetrolCycleError(my.errors.concurrentUpdate, 409, "CONCURRENT_UPDATE");
+    }
 
-    const [result] = await tx
-      .select()
-      .from(petrolCycles)
-      .where(eq(petrolCycles.id, lockedCycle.id))
-      .limit(1);
-
-    return loadCycleWithTransactions(result, tx);
+    return loadCycleWithTransactions(updatedCycle, tx);
   });
 }
 
 export async function getPetrolHistory(vehicleId: string, userId: string) {
-  await getVehicleForUser(vehicleId, userId);
-
+  const vehicle = await findOwnedActiveVehicle(vehicleId, userId);
+  if (!vehicle) {
+    throw new PetrolCycleError(my.errors.vehicleNotFound, 404, "VEHICLE_NOT_FOUND");
+  }
   const cycles = await db
     .select()
     .from(petrolCycles)
     .where(eq(petrolCycles.vehicleId, vehicleId))
     .orderBy(desc(petrolCycles.cycleNumber));
-
   const { cycleIntervalDays, timezone } = await getAllocationAndInterval();
 
   return Promise.all(
     cycles.map(async (cycle) => {
-      const withTx = await loadCycleWithTransactions(cycle);
+      const withTransactions = await loadCycleWithTransactions(cycle);
       return {
-        cycle: withTx,
+        cycle: withTransactions,
         computation: computeCycleState(
-          withTx.allowedLitres,
-          mapTransactions(withTx.transactions),
+          withTransactions.allowedLitres,
+          mapTransactions(withTransactions.transactions),
           cycleIntervalDays,
           timezone,
         ),
@@ -292,47 +241,91 @@ export async function getPetrolHistory(vehicleId: string, userId: string) {
   );
 }
 
-export async function getVehiclePetrolSummary(vehicleId: string, userId: string) {
-  const cycle = await getCurrentCycle(vehicleId, userId);
-  const { allowedLitres, timezone } = await getAllocationAndInterval();
+export async function getVehiclePetrolSummary(
+  vehicleId: string,
+  userId: string,
+  asOf = new Date(),
+): Promise<VehiclePetrolSummary> {
+  const [vehicle, settings] = await Promise.all([
+    findOwnedActiveVehicle(vehicleId, userId),
+    getAllocationAndInterval(),
+  ]);
+  if (!vehicle) {
+    throw new PetrolCycleError(my.errors.vehicleNotFound, 404, "VEHICLE_NOT_FOUND");
+  }
 
-  if (!cycle) {
+  const { allowedLitres, cycleIntervalDays, timezone } = settings;
+  const drivingAllowed = isDrivingAllowedForParity(vehicle.plateParity, asOf, timezone);
+  const cycleRecord = await findCurrentCycle(vehicleId);
+
+  if (!cycleRecord) {
     return {
       allowedLitres,
       totalTaken: 0,
       remainingLitres: allowedLitres,
-      status: "OPEN" as const,
+      status: "AVAILABLE",
+      persistedStatus: null,
+      cycleStartedAt: null,
       completedAt: null,
       nextEligibleAt: null,
+      nextAllowedRefillAt: getNextDrivingAllowedDay(asOf, vehicle.plateParity, timezone),
       cycleNumber: null,
-      canTakePetrol: true,
+      isEligibleForNewCycle: true,
+      drivingAllowed,
+      canTakePetrol: drivingAllowed,
+      blockedReason: drivingAllowed ? null : "DRIVING_RESTRICTED",
     };
   }
 
-  const computation = await getCycleComputation(cycle);
-  const now = new Date();
+  const cycle = await loadCycleWithTransactions(cycleRecord);
+  const computation = computeCycleState(
+    cycle.allowedLitres,
+    mapTransactions(cycle.transactions),
+    cycleIntervalDays,
+    timezone,
+  );
+  const eligible = isEligibleForNewCycle(computation, asOf, timezone);
 
-  if (isEligibleForNewCycle(computation, now, timezone)) {
+  if (eligible) {
+    const nextDrivingAnchor = computation.nextEligibleAt &&
+      computation.nextEligibleAt.getTime() > startOfAppDay(asOf, timezone).getTime()
+      ? computation.nextEligibleAt
+      : asOf;
     return {
       allowedLitres,
       totalTaken: 0,
       remainingLitres: allowedLitres,
-      status: "OPEN" as const,
-      completedAt: null,
-      nextEligibleAt: null,
+      status: "AVAILABLE",
+      persistedStatus: cycle.status,
+      cycleStartedAt: computation.cycleStartedAt,
+      completedAt: computation.completedAt,
+      nextEligibleAt: computation.nextEligibleAt,
+      nextAllowedRefillAt: getNextDrivingAllowedDay(nextDrivingAnchor, vehicle.plateParity, timezone),
       cycleNumber: cycle.cycleNumber + 1,
-      canTakePetrol: true,
+      isEligibleForNewCycle: true,
+      drivingAllowed,
+      canTakePetrol: drivingAllowed,
+      blockedReason: drivingAllowed ? null : "DRIVING_RESTRICTED",
     };
   }
 
+  const open = computation.status === "OPEN" && computation.remainingLitres > 0;
   return {
     allowedLitres: cycle.allowedLitres,
     totalTaken: computation.totalTaken,
     remainingLitres: computation.remainingLitres,
-    status: computation.status,
+    status: computation.status === "OPEN" ? "OPEN" : "COMPLETED",
+    persistedStatus: cycle.status,
+    cycleStartedAt: computation.cycleStartedAt,
     completedAt: computation.completedAt,
     nextEligibleAt: computation.nextEligibleAt,
+    nextAllowedRefillAt: computation.nextEligibleAt
+      ? getNextDrivingAllowedDay(open ? asOf : computation.nextEligibleAt, vehicle.plateParity, timezone)
+      : null,
     cycleNumber: cycle.cycleNumber,
-    canTakePetrol: canRecordTransaction(computation, now, timezone),
+    isEligibleForNewCycle: false,
+    drivingAllowed,
+    canTakePetrol: open && drivingAllowed,
+    blockedReason: open && !drivingAllowed ? "DRIVING_RESTRICTED" : open ? null : "ALLOCATION_COMPLETE",
   };
 }

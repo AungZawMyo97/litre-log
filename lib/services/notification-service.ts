@@ -4,7 +4,7 @@ import { my, parityLabelMy } from "@/lib/i18n/my";
 import { getVehiclePetrolSummary } from "@/lib/services/petrol-cycle-service";
 import { isDrivingAllowedForParity } from "@/lib/services/vehicle-restriction-service";
 import { getAppTimezone } from "@/lib/settings";
-import { startOfAppDay } from "@/lib/timezone";
+import { formatAppDateInput, startOfAppDay } from "@/lib/timezone";
 
 export async function syncDailyNotifications(userId: string, asOf = new Date()) {
   const timezone = await getAppTimezone();
@@ -29,32 +29,31 @@ export async function syncDailyNotifications(userId: string, asOf = new Date()) 
           vehicle.licensePlate,
           parityLabelMy(vehicle.plateParity),
         ),
+        asOf,
       });
     }
 
     const summary = await getVehiclePetrolSummary(vehicle.id, userId);
 
-    if (summary.status === "OPEN" && summary.remainingLitres > 0) {
+    if (summary.status === "OPEN" && summary.remainingLitres > 0 && summary.drivingAllowed) {
       await upsertNotification({
         userId,
         vehicleId: vehicle.id,
         type: "PETROL_REMAINING",
         title: my.notifications.petrolRemainingTitle,
         message: my.notifications.petrolRemainingMsg(summary.remainingLitres, vehicle.name),
+        asOf,
       });
     }
 
-    if (
-      summary.status === "COMPLETED" &&
-      summary.nextEligibleAt &&
-      today.getTime() >= summary.nextEligibleAt.getTime()
-    ) {
+    if (summary.isEligibleForNewCycle && summary.persistedStatus && summary.drivingAllowed) {
       await upsertNotification({
         userId,
         vehicleId: vehicle.id,
         type: "PETROL_ELIGIBLE",
         title: my.notifications.petrolEligibleTitle,
         message: my.notifications.petrolEligibleMsg(vehicle.name, vehicle.licensePlate),
+        asOf,
       });
     }
   }
@@ -66,9 +65,11 @@ async function upsertNotification(input: {
   type: NotificationType;
   title: string;
   message: string;
+  asOf: Date;
 }) {
   const timezone = await getAppTimezone();
-  const dayStart = startOfAppDay(new Date(), timezone);
+  const dayStart = startOfAppDay(input.asOf, timezone);
+  const notificationDate = formatAppDateInput(dayStart, timezone);
 
   const [existing] = await db
     .select()
@@ -78,6 +79,7 @@ async function upsertNotification(input: {
         eq(notifications.userId, input.userId),
         eq(notifications.vehicleId, input.vehicleId),
         eq(notifications.type, input.type),
+        eq(notifications.notificationDate, notificationDate),
         isNull(notifications.readAt),
         gte(notifications.createdAt, dayStart),
       ),
@@ -88,8 +90,19 @@ async function upsertNotification(input: {
     return existing;
   }
 
-  const [created] = await db.insert(notifications).values(input).returning();
-  return created;
+  const [created] = await db
+    .insert(notifications)
+    .values({
+      userId: input.userId,
+      vehicleId: input.vehicleId,
+      type: input.type,
+      title: input.title,
+      message: input.message,
+      notificationDate,
+    })
+    .onConflictDoNothing()
+    .returning();
+  return created ?? existing;
 }
 
 export async function listNotifications(userId: string) {
@@ -106,4 +119,11 @@ export async function markNotificationRead(userId: string, notificationId: strin
     .update(notifications)
     .set({ readAt: new Date() })
     .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)));
+}
+
+export async function markAllNotificationsRead(userId: string) {
+  return db
+    .update(notifications)
+    .set({ readAt: new Date() })
+    .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
 }

@@ -14,7 +14,7 @@ Myanmar vehicle petrol cycle and odd/even driving-day tracker. Litre Log is also
 ```bash
 npm install
 cp .env.example .env   # add your Neon DATABASE_URL and AUTH_SECRET
-npm run db:push
+npm run db:migrate
 npm run dev
 ```
 
@@ -26,10 +26,12 @@ Open `http://localhost:3000` during development. For phone installation, deploy 
 |---|---|
 | `npm run dev` | Start development server |
 | `npm run db:push` | Push schema to Neon |
+| `npm run db:migrate` | Apply tracked, data-preserving migrations |
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm run lint` | Run ESLint |
 | `npm run build` | Create a production build |
 | `npm test` | Run business-rule tests |
+| `npm run test:integration` | Run destructive integration tests against `TEST_DATABASE_URL` only |
 
 ## Environment variables
 
@@ -37,6 +39,7 @@ Open `http://localhost:3000` during development. For phone installation, deploy 
 |---|---|
 | `DATABASE_URL` | Neon PostgreSQL connection string (pooler URL recommended) |
 | `AUTH_SECRET` | JWT session signing secret |
+| `TEST_DATABASE_URL` | Dedicated disposable database used only by integration tests |
 
 ## Database
 
@@ -69,4 +72,9 @@ The shared theme is defined in `app/globals.css` with a white surface and muted 
 1. Transactions accumulate toward the configured allocation (default 40 L).
 2. While total < allocation, cycle stays **OPEN**.
 3. When total >= allocation, cycle **COMPLETES** on the date of the final transaction.
-4. Next eligible date = completion date + interval days (default 7).
+4. The first transaction starts the cycle window; next eligibility is that date plus the configured interval (default 7 days).
+5. Petrol can only be recorded on a driving-allowed day for the vehicle's odd/even plate parity.
+
+## Test safety
+
+`npm test` runs database-free business-rule tests. Database integration tests refuse to start without a dedicated `TEST_DATABASE_URL`, and that URL must differ from `DATABASE_URL`.

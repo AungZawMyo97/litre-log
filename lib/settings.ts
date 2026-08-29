@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db, systemSettings } from "@/lib/db";
+import { cache } from "react";
 
 export const DEFAULT_SETTINGS = {
   petrol_allocation_litres: "40",
@@ -9,14 +10,14 @@ export const DEFAULT_SETTINGS = {
 
 export type SettingKey = keyof typeof DEFAULT_SETTINGS;
 
-export async function getSetting(key: SettingKey): Promise<string> {
+export const getSetting = cache(async (key: SettingKey): Promise<string> => {
   const [row] = await db
     .select()
     .from(systemSettings)
     .where(eq(systemSettings.key, key))
     .limit(1);
   return row?.value ?? DEFAULT_SETTINGS[key];
-}
+});
 
 export async function getNumericSetting(key: SettingKey): Promise<number> {
   const value = await getSetting(key);

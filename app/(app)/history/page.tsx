@@ -4,16 +4,20 @@ import { getSessionUser } from "@/lib/auth";
 import { getPetrolHistory } from "@/lib/services/petrol-cycle-service";
 import { formatAppDate } from "@/lib/timezone";
 import { my } from "@/lib/i18n/my";
+import { getAppTimezone } from "@/lib/settings";
 
 export default async function HistoryPage() {
   const user = await getSessionUser();
   if (!user) return null;
 
-  const userVehicles = await db
-    .select()
-    .from(vehicles)
-    .where(and(eq(vehicles.userId, user.id), eq(vehicles.isActive, true)))
-    .orderBy(asc(vehicles.createdAt));
+  const [userVehicles, timezone] = await Promise.all([
+    db
+      .select()
+      .from(vehicles)
+      .where(and(eq(vehicles.userId, user.id), eq(vehicles.isActive, true)))
+      .orderBy(asc(vehicles.createdAt)),
+    getAppTimezone(),
+  ]);
 
   const histories = await Promise.all(
     userVehicles.map(async (vehicle) => ({
@@ -23,51 +27,51 @@ export default async function HistoryPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <div>
-        <h1 className="font-display text-2xl font-bold">{my.history.title}</h1>
-        <p className="mt-1 text-base text-[var(--muted)]">{my.history.desc}</p>
+        <h1 className="font-display text-3xl font-bold leading-relaxed text-[var(--hero)]">{my.history.title}</h1>
+        <p className="mt-1 max-w-3xl text-[var(--muted)]">{my.history.desc}</p>
       </div>
 
       {histories.map(({ vehicle, history }) => (
-        <section key={vehicle.id} className="space-y-3">
-          <h2 className="text-lg font-bold">
+        <section key={vehicle.id} className="space-y-4">
+          <h2 className="text-xl font-bold text-[var(--hero)]">
             {vehicle.name} - {vehicle.licensePlate}
           </h2>
           {history.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">{my.history.noCycles}</p>
           ) : (
             history.map(({ cycle, computation }) => (
-              <article key={cycle.id} className="rounded-lg border border-[var(--line)] bg-[var(--card)] p-5">
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="font-bold">{my.history.cycle(cycle.cycleNumber)}</h3>
-                  <span className="rounded-lg bg-[var(--surface)] px-3 py-1 text-sm font-semibold text-[var(--muted)]">
-                    {my.status[computation.status]}
+              <article key={cycle.id} className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5 shadow-[var(--shadow-card)] sm:p-6">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h3 className="text-lg font-bold">{my.history.cycle(cycle.cycleNumber)}</h3>
+                  <span className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-3 py-1 text-sm font-bold text-[var(--muted)]">
+                    {my.status[cycle.status]}
                   </span>
                 </div>
                 <ul className="space-y-2 text-base">
                   {cycle.transactions.map((tx) => (
-                    <li key={tx.id} className="flex justify-between">
-                      <span>{formatAppDate(tx.transactionAt)}</span>
-                      <span>{tx.litres} L</span>
+                    <li key={tx.id} className="flex justify-between gap-4 rounded-lg py-1">
+                      <span>{formatAppDate(tx.transactionAt, timezone)}</span>
+                      <span className="font-bold tabular-nums">{tx.litres} L</span>
                     </li>
                   ))}
                 </ul>
                 <div className="mt-4 grid gap-2 border-t border-[var(--line)] pt-4 text-base">
                   <div className="flex justify-between">
                     <span className="text-[var(--muted)]">{my.history.total}</span>
-                    <span>{computation.totalTaken} L</span>
+                    <span className="font-bold tabular-nums">{computation.totalTaken} L</span>
                   </div>
                   {computation.completedAt ? (
                     <div className="flex justify-between">
                       <span className="text-[var(--muted)]">{my.history.completed}</span>
-                      <span>{formatAppDate(computation.completedAt)}</span>
+                      <span>{formatAppDate(computation.completedAt, timezone)}</span>
                     </div>
                   ) : null}
                   {computation.nextEligibleAt ? (
                     <div className="flex justify-between">
                       <span className="text-[var(--muted)]">{my.history.nextEligible}</span>
-                      <span>{formatAppDate(computation.nextEligibleAt)}</span>
+                      <span>{formatAppDate(computation.nextEligibleAt, timezone)}</span>
                     </div>
                   ) : null}
                 </div>

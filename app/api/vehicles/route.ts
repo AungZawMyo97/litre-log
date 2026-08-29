@@ -6,6 +6,7 @@ import { my } from "@/lib/i18n/my";
 
 import { getSessionUser } from "@/lib/auth";
 import { parsePlateParity } from "@/lib/services/license-plate-service";
+import { apiErrorResponse } from "@/lib/api-response";
 
 const vehicleSchema = z.object({
   name: z.string().min(1).max(100),
@@ -67,7 +68,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ vehicle }, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : my.errors.invalidVehicleData;
-    return NextResponse.json({ error: message }, { status: 400 });
+    return apiErrorResponse(error, my.errors.invalidVehicleData);
   }
 }

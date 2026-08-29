@@ -5,6 +5,7 @@ import { db, vehicles } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { my } from "@/lib/i18n/my";
 import { parsePlateParity } from "@/lib/services/license-plate-service";
+import { apiErrorResponse } from "@/lib/api-response";
 
 const updateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -77,8 +78,7 @@ export async function PUT(request: Request, context: RouteContext) {
 
     return NextResponse.json({ vehicle: updated });
   } catch (error) {
-    const message = error instanceof Error ? error.message : my.errors.invalidVehicleData;
-    return NextResponse.json({ error: message }, { status: 400 });
+    return apiErrorResponse(error, my.errors.invalidVehicleData);
   }
 }
 

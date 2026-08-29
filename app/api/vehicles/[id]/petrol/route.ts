@@ -7,10 +7,10 @@ import {
   getCurrentCycle,
   getCycleComputation,
   recordPetrolTransaction,
-  PetrolCycleError,
 } from "@/lib/services/petrol-cycle-service";
 import { getAppTimezone } from "@/lib/settings";
 import { parseAppDateInput } from "@/lib/timezone";
+import { apiErrorResponse } from "@/lib/api-response";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -30,19 +30,16 @@ export async function GET(_request: Request, context: RouteContext) {
 
     return NextResponse.json({ summary, cycle, computation });
   } catch (error) {
-    if (error instanceof PetrolCycleError) {
-      return NextResponse.json({ error: error.message }, { status: error.statusCode });
-    }
-    return NextResponse.json({ error: my.errors.loadPetrolFailed }, { status: 500 });
+    return apiErrorResponse(error, my.errors.loadPetrolFailed);
   }
 }
 
 const transactionSchema = z.object({
   litres: z.number().positive(),
-  transactionAt: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
-  station: z.string().optional(),
-  receiptRef: z.string().optional(),
-  notes: z.string().optional(),
+  transactionAt: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+  station: z.string().max(120).optional(),
+  receiptRef: z.string().max(120).optional(),
+  notes: z.string().max(500).optional(),
 });
 
 export async function POST(request: Request, context: RouteContext) {
@@ -70,10 +67,6 @@ export async function POST(request: Request, context: RouteContext) {
     const summary = await getVehiclePetrolSummary(id, user.id);
     return NextResponse.json({ cycle, summary }, { status: 201 });
   } catch (error) {
-    if (error instanceof PetrolCycleError) {
-      return NextResponse.json({ error: error.message }, { status: error.statusCode });
-    }
-    const message = error instanceof Error ? error.message : my.errors.recordTransactionFailed;
-    return NextResponse.json({ error: message }, { status: 400 });
+    return apiErrorResponse(error, my.errors.recordTransactionFailed);
   }
 }

@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
-import { db, petrolCycles, vehicles } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { my } from "@/lib/i18n/my";
-import { getVehiclePetrolSummary } from "@/lib/services/petrol-cycle-service";
-import {
-  buildCalendarDayStatus,
-  getNextDrivingAllowedDay,
-  isDrivingAllowedForParity,
-} from "@/lib/services/vehicle-restriction-service";
 import { getAppTimezone } from "@/lib/settings";
-import { startOfAppDay, addAppDays, getAppMonthDays, parseAppDateInput, isSameAppDay } from "@/lib/timezone";
+import { PetrolCycleError } from "@/lib/services/petrol-cycle-service";
+import { getVehicleCalendar } from "@/lib/services/vehicle-calendar-service";
+import { addAppDays, getAppMonthDays, parseAppDateInput, startOfAppDay } from "@/lib/timezone";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -18,71 +12,38 @@ export async function GET(request: Request, context: RouteContext) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: my.errors.unauthorized }, { status: 401 });
 
-  const { id } = await context.params;
-  const { searchParams } = new URL(request.url);
-  const monthParam = searchParams.get("month");
-
-  const [vehicle] = await db
-    .select()
-    .from(vehicles)
-    .where(and(eq(vehicles.id, id), eq(vehicles.userId, user.id), eq(vehicles.isActive, true)))
-    .limit(1);
-
-  if (!vehicle) {
-    return NextResponse.json({ error: my.errors.vehicleNotFound }, { status: 404 });
+  const [{ id }, timezone] = await Promise.all([context.params, getAppTimezone()]);
+  const month = new URL(request.url).searchParams.get("month");
+  if (month && !/^\d{4}-\d{2}$/.test(month)) {
+    return NextResponse.json({ error: my.errors.invalidRequest }, { status: 400 });
   }
 
-  const timezone = await getAppTimezone();
-  const anchor = monthParam ? parseAppDateInput(`${monthParam}-01`, timezone) : new Date();
-  const monthDays = getAppMonthDays(anchor, timezone);
-  const rangeStart = startOfAppDay(monthDays[0] ?? anchor, timezone);
-  const rangeEnd = startOfAppDay(monthDays[monthDays.length - 1] ?? anchor, timezone);
-  const today = startOfAppDay(new Date(), timezone);
+  let anchor: Date;
+  try {
+    anchor = month ? parseAppDateInput(`${month}-01`, timezone) : new Date();
+  } catch {
+    return NextResponse.json({ error: my.errors.invalidRequest }, { status: 400 });
+  }
 
-  const summary = await getVehiclePetrolSummary(id, user.id);
-  const cycles = await db.select().from(petrolCycles).where(eq(petrolCycles.vehicleId, id));
+  try {
+    const calendar = await getVehicleCalendar(id, user.id, anchor);
+    const monthDays = getAppMonthDays(anchor, timezone);
+    const rangeStart = startOfAppDay(monthDays[0] ?? anchor, timezone);
+    const rangeEnd = startOfAppDay(monthDays[monthDays.length - 1] ?? anchor, timezone);
 
-  const days = monthDays.map((date) => {
-    const appDay = startOfAppDay(date, timezone);
-
-    const completedOnDay = cycles.some(
-      (cycle) =>
-        cycle.completedAt &&
-        startOfAppDay(cycle.completedAt, timezone).getTime() === appDay.getTime(),
-    );
-
-    const rawNextEligibleDay = summary.nextEligibleAt
-      ? startOfAppDay(summary.nextEligibleAt, timezone)
-      : null;
-
-    const nextEligibleDay = rawNextEligibleDay
-      ? getNextDrivingAllowedDay(rawNextEligibleDay, vehicle.plateParity, timezone)
-      : null;
-
-    const refillAvailable =
-      nextEligibleDay !== null &&
-      appDay.getTime() >= nextEligibleDay.getTime() &&
-      isDrivingAllowedForParity(vehicle.plateParity, appDay, timezone);
-
-    const isToday = isSameAppDay(appDay, today, timezone);
-
-    return buildCalendarDayStatus(vehicle.plateParity, appDay, {
-      timezone,
-      petrolRefillAvailable: refillAvailable,
-      petrolCycleIncomplete: isToday && summary.status === "OPEN" && summary.remainingLitres > 0,
-      petrolCycleCompleted: completedOnDay,
+    return NextResponse.json({
+      vehicle: calendar.vehicle,
+      summary: calendar.summary,
+      days: calendar.days.map((day) => ({ ...day, date: day.date.toISOString() })),
+      nextEligibleAt: calendar.summary.nextEligibleAt?.toISOString() ?? null,
+      nextAllowedRefillAt: calendar.nextAllowedRefillAt?.toISOString() ?? null,
+      monthStart: rangeStart.toISOString(),
+      monthEnd: addAppDays(rangeEnd, 0, timezone).toISOString(),
     });
-  });
-
-  return NextResponse.json({
-    vehicle,
-    summary,
-    days: days.map((day) => ({
-      ...day,
-      date: day.date.toISOString(),
-    })),
-    nextEligibleAt: summary.nextEligibleAt?.toISOString() ?? null,
-    monthStart: rangeStart.toISOString(),
-    monthEnd: addAppDays(rangeEnd, 0, timezone).toISOString(),
-  });
+  } catch (error) {
+    if (error instanceof PetrolCycleError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
+    return NextResponse.json({ error: my.errors.loadCalendarFailed }, { status: 500 });
+  }
 }

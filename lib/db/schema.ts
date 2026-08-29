@@ -1,5 +1,7 @@
 import {
   boolean,
+  check,
+  date,
   doublePrecision,
   index,
   integer,
@@ -9,6 +11,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const plateParityEnum = pgEnum("plate_parity", ["ODD", "EVEN"]);
 export const petrolCycleStatusEnum = pgEnum("petrol_cycle_status", ["OPEN", "COMPLETED", "SUPERSEDED"]);
@@ -70,6 +73,9 @@ export const petrolCycles = pgTable(
   (table) => [
     uniqueIndex("petrol_cycles_vehicle_cycle_idx").on(table.vehicleId, table.cycleNumber),
     index("petrol_cycles_vehicle_status_idx").on(table.vehicleId, table.status),
+    check("petrol_cycles_cycle_number_positive", sql`${table.cycleNumber} > 0`),
+    check("petrol_cycles_allowed_litres_positive", sql`${table.allowedLitres} > 0`),
+    check("petrol_cycles_version_nonnegative", sql`${table.version} >= 0`),
   ],
 );
 
@@ -89,7 +95,10 @@ export const petrolTransactions = pgTable(
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index("petrol_transactions_cycle_id_idx").on(table.cycleId)],
+  (table) => [
+    index("petrol_transactions_cycle_id_idx").on(table.cycleId),
+    check("petrol_transactions_litres_positive", sql`${table.litres} > 0`),
+  ],
 );
 
 export const notifications = pgTable(
@@ -102,13 +111,22 @@ export const notifications = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     vehicleId: text("vehicle_id"),
+    notificationDate: date("notification_date").notNull(),
     type: notificationTypeEnum("type").notNull(),
     title: text("title").notNull(),
     message: text("message").notNull(),
     readAt: timestamp("read_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index("notifications_user_read_idx").on(table.userId, table.readAt)],
+  (table) => [
+    index("notifications_user_read_idx").on(table.userId, table.readAt),
+    uniqueIndex("notifications_daily_unique_idx").on(
+      table.userId,
+      table.vehicleId,
+      table.type,
+      table.notificationDate,
+    ),
+  ],
 );
 
 export const systemSettings = pgTable("system_settings", {

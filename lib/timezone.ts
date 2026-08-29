@@ -1,5 +1,5 @@
 import { formatInTimeZone, toZonedTime, fromZonedTime } from "date-fns-tz";
-import { getDaysInMonth } from "date-fns";
+import { addMonths, getDaysInMonth } from "date-fns";
 
 export const APP_TIMEZONE = "Asia/Yangon";
 
@@ -18,6 +18,12 @@ export function addAppDays(date: Date, days: number, timezone = APP_TIMEZONE): D
   zoned.setDate(zoned.getDate() + days);
   zoned.setHours(0, 0, 0, 0);
   return fromZonedTime(zoned, timezone);
+}
+
+export function addAppMonths(date: Date, months: number, timezone = APP_TIMEZONE): Date {
+  const shifted = addMonths(toZonedTime(date, timezone), months);
+  shifted.setHours(12, 0, 0, 0);
+  return fromZonedTime(shifted, timezone);
 }
 
 export function formatAppDate(date: Date, timezone = APP_TIMEZONE): string {
@@ -49,9 +55,23 @@ export function isSameAppDay(a: Date, b: Date, timezone = APP_TIMEZONE): boolean
 }
 
 export function parseAppDateInput(value: string, timezone = APP_TIMEZONE): Date {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new RangeError("Invalid app date.");
+  }
+
   const [year, month, day] = value.split("-").map(Number);
   const local = new Date(year, month - 1, day, 12, 0, 0, 0);
-  return fromZonedTime(local, timezone);
+  const parsed = fromZonedTime(local, timezone);
+
+  if (formatAppDateInput(parsed, timezone) !== value) {
+    throw new RangeError("Invalid app date.");
+  }
+
+  return parsed;
+}
+
+export function isFutureAppDay(date: Date, asOf: Date, timezone = APP_TIMEZONE): boolean {
+  return startOfAppDay(date, timezone).getTime() > startOfAppDay(asOf, timezone).getTime();
 }
 
 export function getAppMonthDays(anchor: Date, timezone = APP_TIMEZONE): Date[] {

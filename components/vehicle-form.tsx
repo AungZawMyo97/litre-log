@@ -19,38 +19,42 @@ export function VehicleForm() {
     setLoading(true);
     setError(null);
 
-    const response = await fetch("/api/vehicles", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        licensePlate,
-        ...(plateParity ? { plateParity } : {}),
-      }),
-    });
+    try {
+      const response = await fetch("/api/vehicles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          licensePlate,
+          ...(plateParity ? { plateParity } : {}),
+        }),
+      });
+      const data = await response.json();
 
-    const data = await response.json();
-    setLoading(false);
-
-    if (!response.ok) {
-      setError(data.error ?? my.errors.createVehicleFailed);
-      if (data.suggestedParity && !plateParity) {
-        setPlateParity(data.suggestedParity);
+      if (!response.ok) {
+        setError(data.error ?? my.errors.createVehicleFailed);
+        if (data.suggestedParity && !plateParity) {
+          setPlateParity(data.suggestedParity);
+        }
+        return;
       }
-      return;
-    }
 
-    setName("");
-    setLicensePlate("");
-    setPlateParity("");
-    startTransition(() => {
-      router.refresh();
-    });
+      setName("");
+      setLicensePlate("");
+      setPlateParity("");
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch {
+      setError(my.errors.createVehicleFailed);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4 rounded-lg border border-[var(--line)] bg-[var(--card)] p-5">
-      <h2 className="font-display text-xl font-bold">{my.vehicle.addVehicle}</h2>
+    <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5 shadow-[var(--shadow-card)] sm:p-6">
+      <h2 className="font-display text-xl font-bold text-[var(--hero)]">{my.vehicle.addVehicle}</h2>
       <label className="block space-y-2">
         <span className="font-semibold">{my.vehicle.nameLabel}</span>
         <input
@@ -59,7 +63,7 @@ export function VehicleForm() {
           onChange={(e) => setName(e.target.value)}
           disabled={busy}
           placeholder={my.vehicle.nicknamePlaceholder}
-          className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4 disabled:bg-[var(--surface)] disabled:opacity-75"
+          className="min-h-14 w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 text-lg shadow-sm disabled:bg-[var(--surface)] disabled:opacity-75"
         />
       </label>
       <label className="block space-y-2">
@@ -70,7 +74,7 @@ export function VehicleForm() {
           onChange={(e) => setLicensePlate(e.target.value)}
           disabled={busy}
           placeholder={my.vehicle.platePlaceholder}
-          className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4 disabled:bg-[var(--surface)] disabled:opacity-75"
+          className="min-h-14 w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 text-lg shadow-sm disabled:bg-[var(--surface)] disabled:opacity-75"
         />
       </label>
       <label className="block space-y-2">
@@ -79,18 +83,18 @@ export function VehicleForm() {
           value={plateParity}
           onChange={(e) => setPlateParity(e.target.value as "" | "ODD" | "EVEN")}
           disabled={busy}
-          className="min-h-12 w-full rounded-lg border border-[var(--line)] bg-white px-4 disabled:bg-[var(--surface)] disabled:opacity-75"
+          className="min-h-14 w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 text-lg shadow-sm disabled:bg-[var(--surface)] disabled:opacity-75"
         >
           <option value="">{my.vehicle.autoDetectParity}</option>
           <option value="ODD">{my.vehicle.odd}</option>
           <option value="EVEN">{my.vehicle.even}</option>
         </select>
       </label>
-      {error ? <p className="text-sm text-[var(--bad)]">{error}</p> : null}
+      {error ? <p role="alert" className="rounded-xl bg-[var(--bad-soft)] p-3 font-semibold text-[var(--bad)]">{error}</p> : null}
       <button
         type="submit"
         disabled={busy}
-        className="min-h-12 w-full rounded-lg bg-[var(--accent)] px-4 py-3 font-bold text-white disabled:opacity-60"
+        className="min-h-14 w-full rounded-xl bg-[var(--accent)] px-5 py-3 font-bold text-white shadow-sm hover:bg-[var(--accent-hover)] disabled:opacity-60"
       >
         {busy ? my.common.saving : my.vehicle.saveVehicle}
       </button>

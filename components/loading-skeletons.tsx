@@ -4,7 +4,7 @@ function SkeletonLine({ className = "" }: { className?: string }) {
 
 function CardSkeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <article className="rounded-lg border border-[var(--line)] bg-[var(--card)] p-5 shadow-[0_14px_34px_rgba(28,37,32,0.06)]">
+    <article className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5 shadow-[var(--shadow-card)]">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <SkeletonLine className="h-7 w-44" />
@@ -33,7 +33,7 @@ function PageHeadingSkeleton() {
 export function DashboardSkeleton() {
   return (
     <div className="space-y-6" aria-label="Loading dashboard">
-      <section className="rounded-lg bg-[var(--hero)] px-5 py-6 shadow-[0_18px_42px_rgba(23,63,53,0.16)]">
+      <section className="rounded-2xl bg-[var(--hero)] px-5 py-7 shadow-[0_18px_42px_rgba(23,63,53,0.16)]">
         <SkeletonLine className="h-4 w-20 bg-white/25" />
         <SkeletonLine className="mt-3 h-8 w-full max-w-sm bg-white/30" />
         <SkeletonLine className="mt-4 h-5 w-full max-w-2xl bg-white/20" />

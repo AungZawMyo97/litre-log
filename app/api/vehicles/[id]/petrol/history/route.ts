@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { my } from "@/lib/i18n/my";
-import { getPetrolHistory, PetrolCycleError } from "@/lib/services/petrol-cycle-service";
+import { getPetrolHistory } from "@/lib/services/petrol-cycle-service";
+import { apiErrorResponse } from "@/lib/api-response";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -17,14 +18,11 @@ export async function GET(request: Request, context: RouteContext) {
     let history = await getPetrolHistory(id, user.id);
 
     if (status === "OPEN" || status === "COMPLETED" || status === "SUPERSEDED") {
-      history = history.filter((item) => item.computation.status === status);
+      history = history.filter((item) => item.cycle.status === status);
     }
 
     return NextResponse.json({ history });
   } catch (error) {
-    if (error instanceof PetrolCycleError) {
-      return NextResponse.json({ error: error.message }, { status: error.statusCode });
-    }
-    return NextResponse.json({ error: my.errors.loadHistoryFailed }, { status: 500 });
+    return apiErrorResponse(error, my.errors.loadHistoryFailed);
   }
 }

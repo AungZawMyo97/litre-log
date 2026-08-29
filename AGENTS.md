@@ -22,7 +22,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - `npm run dev` — Start dev server
 - `npm test` — Run tests
+- `npm run test:integration` — Run database tests; requires a separate `TEST_DATABASE_URL`
 - `npx tsc --noEmit` — Type check
+- `npm run db:migrate` — Apply tracked Drizzle migrations
 - `npx drizzle-kit push` — Push schema changes
 - `npx drizzle-kit studio` — Open Drizzle Studio
 
@@ -33,6 +35,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **PWA**: Keep `app/manifest.ts`, `public/sw.js`, and app icons in sync with branding changes.
 - **Service worker**: Never cache `/api/*` requests. Keep authenticated routes and mutations network-only.
 - **Theme**: White background with muted navy-blue accents. Avoid bright blue or orange-dominant UI unless direction changes.
+- **Cycle timing**: The first refill starts the configurable 7-day window. Completing the allocation does not restart or extend that window.
+- **Petrol eligibility**: Keep derived eligibility separate from persisted cycle status. A new allocation may be available while the previous cycle remains `COMPLETED` or `SUPERSEDED`.
+- **Driving enforcement**: Petrol may only be recorded when the vehicle is allowed to drive on the transaction date.
+- **Transaction safety**: Serialize petrol writes per vehicle inside one database transaction. Ownership lookup, cycle selection, validation, insertion, and cycle update must use the same transaction client.
+- **Refill dates**: Accept real, nonfuture app-timezone dates only. A refill cannot predate the active cycle.
+- **Test database safety**: Integration tests use only `TEST_DATABASE_URL`, which must differ from `DATABASE_URL`. Never reset or delete test data through the development or production connection.
+- **Next.js proxy**: Use root `proxy.ts` for optimistic route checks. Every data access and mutation must still perform its own authorization.
 
 ## Code Conventions
 
@@ -40,7 +49,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - colocate components, tests, and helpers next to the route they serve.
 - Prefer `date-fns-tz` for timezone-aware date operations — never raw `Date` arithmetic.
 - Use `startOfAppDay()` and `addAppDays()` from `lib/timezone.ts` for all date normalization.
+- Honor the configured app timezone end to end, defaulting to `Asia/Yangon`; do not silently format dates in the server's local timezone.
 - All monetary/quantity fields use `doublePrecision` in Drizzle schema.
+- Keep pure domain rules, database repositories, application orchestration, route validation, and React presentation in separate modules. Server services must not import component types.
+- Return expected domain failures as typed errors and map them to localized API responses. Never expose raw database or validation-library errors.
 
 ## File Structure
 
@@ -58,12 +70,13 @@ lib/
   timezone.ts     # Timezone-aware date helpers
   dashboard.ts    # Dashboard data fetching
 public/           # Static assets, service worker, icons
+drizzle/          # Tracked, data-preserving database migrations
 tests/            # Vitest test files
 ```
 
 ## Key Domain Concepts
 
-- **Petrol cycle**: 40L allocation per 7-day cycle (configurable via `system_settings`).
+- **Petrol cycle**: 40L allocation per 7-day window beginning with the first refill (configurable via `system_settings`).
 - **Cycle states**: `OPEN` → `COMPLETED` → new `OPEN` cycle. `SUPERSEDED` for manual overrides.
 - **Driving restriction**: Odd/even plate parity restricts driving on odd/even calendar days.
 - **Timezone**: All dates normalized to `Asia/Yangon` (UTC+6:30) via `startOfAppDay()`.

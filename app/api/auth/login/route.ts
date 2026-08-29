@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSession, loginUser } from "@/lib/auth";
 import { my } from "@/lib/i18n/my";
+import { apiErrorResponse } from "@/lib/api-response";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -15,7 +16,9 @@ export async function POST(request: Request) {
     await createSession(user);
     return NextResponse.json({ user });
   } catch (error) {
-    const message = error instanceof Error ? error.message : my.errors.loginFailed;
-    return NextResponse.json({ error: message }, { status: 401 });
+    if (error instanceof Error && error.message === my.errors.invalidCredentials) {
+      return NextResponse.json({ error: error.message }, { status: 401 });
+    }
+    return apiErrorResponse(error, my.errors.loginFailed);
   }
 }

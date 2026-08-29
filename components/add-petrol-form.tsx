@@ -3,12 +3,11 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { my } from "@/lib/i18n/my";
-import { formatAppDateInput } from "@/lib/timezone";
 
-export function AddPetrolForm({ vehicleId }: { vehicleId: string }) {
+export function AddPetrolForm({ vehicleId, todayInput }: { vehicleId: string; todayInput: string }) {
   const router = useRouter();
   const [litres, setLitres] = useState("");
-  const [date, setDate] = useState(() => formatAppDateInput(new Date()));
+  const [date, setDate] = useState(todayInput);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -56,12 +55,12 @@ export function AddPetrolForm({ vehicleId }: { vehicleId: string }) {
   return (
     <form
       onSubmit={onSubmit}
-      className="mt-5 grid gap-4 border-t border-(--line) pt-5"
+      className="grid gap-5 border-t border-[var(--line)] bg-[#f8fbfd] p-5 sm:p-6"
     >
-      <p className="font-bold">{my.vehicle.recordRefill}</p>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <p className="text-lg font-bold text-[var(--hero)]">{my.vehicle.recordRefill}</p>
+      <div className="grid gap-4 sm:grid-cols-2">
         <label className="block space-y-2">
-          <span className="text-sm font-semibold text-(--muted)">
+          <span className="font-semibold text-[var(--muted)]">
             {my.vehicle.litresLabel}
           </span>
           <input
@@ -73,28 +72,29 @@ export function AddPetrolForm({ vehicleId }: { vehicleId: string }) {
             onChange={(e) => setLitres(e.target.value)}
             disabled={busy}
             placeholder={my.common.litres}
-            className="min-h-12 w-full rounded-lg border border-(--line) px-4 disabled:bg-[var(--surface)] disabled:opacity-75"
+            className="min-h-14 w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 text-lg shadow-sm disabled:bg-[var(--surface)] disabled:opacity-75"
           />
         </label>
         <label className="block space-y-2">
-          <span className="text-sm font-semibold text-(--muted)">
+          <span className="font-semibold text-[var(--muted)]">
             {my.vehicle.dateLabel}
           </span>
           <input
             type="date"
             required
+            max={todayInput}
             value={date}
             onChange={(e) => setDate(e.target.value)}
             disabled={busy}
-            className="min-h-12 w-full rounded-lg border border-(--line) px-4 disabled:bg-[var(--surface)] disabled:opacity-75"
+            className="min-h-14 w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 text-lg shadow-sm disabled:bg-[var(--surface)] disabled:opacity-75"
           />
         </label>
       </div>
-      {error ? <p className="text-xs text-(--bad)">{error}</p> : null}
+      {error ? <p role="alert" className="rounded-xl bg-[var(--bad-soft)] p-3 font-semibold text-[var(--bad)]">{error}</p> : null}
       <button
         type="submit"
         disabled={busy}
-        className="min-h-12 rounded-lg bg-(--accent) px-4 py-3 font-bold text-white disabled:opacity-60"
+        className="min-h-14 rounded-xl bg-[var(--accent)] px-5 py-3 font-bold text-white shadow-sm hover:bg-[var(--accent-hover)] disabled:opacity-60"
       >
         {busy ? my.common.saving : my.vehicle.addRefill}
       </button>

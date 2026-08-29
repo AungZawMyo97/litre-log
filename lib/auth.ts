@@ -5,6 +5,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
 import { db, users } from "@/lib/db";
+import { cache } from "react";
 
 const SESSION_COOKIE = "litre_log_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
@@ -61,7 +62,7 @@ export async function destroySession() {
   cookieStore.delete(SESSION_COOKIE);
 }
 
-export async function getSessionUser(): Promise<SessionUser | null> {
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -70,12 +71,10 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   try {
     ({ payload } = await jwtVerify(token, getSecret()));
   } catch {
-    await destroySession();
     return null;
   }
 
   if (!payload.sub || typeof payload.sub !== "string") {
-    await destroySession();
     return null;
   }
 
@@ -87,7 +86,6 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       .limit(1);
 
     if (!user) {
-      await destroySession();
       return null;
     }
 
@@ -95,7 +93,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   } catch {
     return null;
   }
-}
+});
 
 export async function requireUser() {
   const user = await getSessionUser();

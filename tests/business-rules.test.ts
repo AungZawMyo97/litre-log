@@ -155,6 +155,11 @@ describe("app date parsing", () => {
     expect(getAppDayOfMonth(days[0], TZ)).toBe(1);
     expect(getAppDayOfMonth(days[days.length - 1], TZ)).toBe(30);
   });
+
+  it("rejects impossible calendar dates", () => {
+    expect(() => parseAppDateInput("2026-02-30", TZ)).toThrow(RangeError);
+    expect(() => parseAppDateInput("2026-13-01", TZ)).toThrow(RangeError);
+  });
 });
 
 describe("license plate parsing", () => {
@@ -189,5 +194,16 @@ describe("driving restrictions", () => {
     const februaryOddDays = getDrivingDaysInMonth("ODD", 2026, 2, TZ);
     expect(februaryOddDays).not.toContain(31);
     expect(februaryOddDays).not.toContain(30);
+  });
+
+  it("keeps odd/even month calculations stable when the server runs in UTC", () => {
+    const originalTimezone = process.env.TZ;
+    process.env.TZ = "UTC";
+    try {
+      expect(getDrivingDaysInMonth("ODD", 2026, 8, TZ).slice(0, 4)).toEqual([1, 3, 5, 7]);
+      expect(getDrivingDaysInMonth("EVEN", 2026, 8, TZ).slice(0, 4)).toEqual([2, 4, 6, 8]);
+    } finally {
+      process.env.TZ = originalTimezone;
+    }
   });
 });
