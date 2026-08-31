@@ -102,6 +102,51 @@ describe("security and concurrency", () => {
     expect(total).toBe(38);
   });
 
+  it("discards an expired partial balance and starts a fresh allocation", async () => {
+    const passwordHash = await hashPassword("Password1");
+    const [user] = await db
+      .insert(users)
+      .values({ email: "rollover@test.com", passwordHash })
+      .returning();
+    const [vehicle] = await db
+      .insert(vehicles)
+      .values({
+        userId: user.id,
+        name: "Rollover Car",
+        licensePlate: "1A-1231",
+        plateParity: "ODD",
+      })
+      .returning();
+
+    await recordPetrolTransaction({
+      vehicleId: vehicle.id,
+      userId: user.id,
+      litres: 18,
+      transactionAt: new Date("2026-08-11T12:00:00+06:30"),
+    });
+    await recordPetrolTransaction({
+      vehicleId: vehicle.id,
+      userId: user.id,
+      litres: 40,
+      transactionAt: new Date("2026-08-19T12:00:00+06:30"),
+    });
+
+    const cycles = await db
+      .select()
+      .from(petrolCycles)
+      .where(eq(petrolCycles.vehicleId, vehicle.id))
+      .orderBy(petrolCycles.cycleNumber);
+    const transactions = await db
+      .select()
+      .from(petrolTransactions)
+      .where(eq(petrolTransactions.cycleId, cycles[1].id));
+
+    expect(cycles).toHaveLength(2);
+    expect(cycles[0]).toMatchObject({ status: "SUPERSEDED", allowedLitres: 40 });
+    expect(cycles[1]).toMatchObject({ status: "COMPLETED", allowedLitres: 40 });
+    expect(transactions.map((transaction) => transaction.litres)).toEqual([40]);
+  });
+
   it("deduplicates daily notifications and can mark all as read", async () => {
     const passwordHash = await hashPassword("Password1");
     const [user] = await db.insert(users).values({ email: "notify@test.com", passwordHash }).returning();

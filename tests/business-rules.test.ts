@@ -3,7 +3,7 @@ import {
   computeCycleState,
   validateTransactionLitres,
   isEligibleForNewCycle,
-  canRecordTransaction,
+  canUseCurrentAllocation,
 } from "@/lib/services/petrol-cycle-logic";
 import { parsePlateParity } from "@/lib/services/license-plate-service";
 import {
@@ -72,8 +72,8 @@ describe("petrol cycle logic", () => {
     expect(result.nextEligibleAt?.toISOString()).toBe(
       addAppDays(startOfAppDay(d("2026-08-11"), TZ), 7, TZ).toISOString(),
     );
-    expect(canRecordTransaction(result, d("2026-08-17"), TZ)).toBe(true);
-    expect(canRecordTransaction(result, d("2026-08-18"), TZ)).toBe(false);
+    expect(canUseCurrentAllocation(result, d("2026-08-17"), TZ)).toBe(true);
+    expect(canUseCurrentAllocation(result, d("2026-08-18"), TZ)).toBe(false);
   });
 
   it("handles 39L taken with 1L remaining", () => {
@@ -112,13 +112,14 @@ describe("petrol cycle logic", () => {
       addAppDays(startOfAppDay(d("2026-08-10"), TZ), 7, TZ).toISOString(),
     );
     expect(isEligibleForNewCycle(partial, d("2026-08-17"), TZ)).toBe(true);
-    expect(canRecordTransaction(partial, d("2026-08-17"), TZ)).toBe(false);
+    expect(canUseCurrentAllocation(partial, d("2026-08-17"), TZ)).toBe(false);
   });
 
   it("marks eligible on next cycle date", () => {
     const completed = computeCycleState(40, [{ litres: 40, transactionAt: d("2026-08-11") }], 7, TZ);
     expect(isEligibleForNewCycle(completed, d("2026-08-18"), TZ)).toBe(true);
     expect(isEligibleForNewCycle(completed, d("2026-08-17"), TZ)).toBe(false);
+    expect(canUseCurrentAllocation(completed, d("2026-08-18"), TZ)).toBe(false);
   });
 });
 

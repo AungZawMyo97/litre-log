@@ -73,7 +73,9 @@ The shared theme is defined in `app/globals.css` with a white surface and muted 
 2. While total < allocation, cycle stays **OPEN**.
 3. When total >= allocation, cycle **COMPLETES** on the date of the final transaction.
 4. The first transaction starts the cycle window; next eligibility is that date plus the configured interval (default 7 days).
-5. Petrol can only be recorded on a driving-allowed day for the vehicle's odd/even plate parity.
+5. Partial withdrawals can continue through the day before that eligibility date.
+6. At eligibility, any unused balance expires and a new cycle starts with only the configured allocation; unused litres never carry over.
+7. Petrol can only be recorded on a driving-allowed day for the vehicle's odd/even plate parity.
 
 ## Test safety
 

@@ -1,4 +1,3 @@
-import { validatePassword as validatePasswordRules } from "@/lib/i18n/auth-messages";
 import { my } from "@/lib/i18n/my";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
@@ -32,8 +31,14 @@ export async function verifyPassword(password: string, passwordHash: string) {
   return bcrypt.compare(password, passwordHash);
 }
 
-export function validatePassword(password: string): string | null {
-  return validatePasswordRules(password);
+function validatePassword(password: string): string | null {
+  if (password.length < 8) {
+    return my.errors.passwordMin;
+  }
+  if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+    return my.errors.passwordComplex;
+  }
+  return null;
 }
 
 export async function createSession(user: SessionUser) {

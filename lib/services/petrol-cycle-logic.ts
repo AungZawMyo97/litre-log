@@ -106,18 +106,14 @@ export function isEligibleForNewCycle(
   return today.getTime() >= computation.nextEligibleAt.getTime();
 }
 
-export function canRecordTransaction(
+export function canUseCurrentAllocation(
   computation: CycleComputation,
   asOf: Date,
   timezone?: string,
 ): boolean {
-  if (computation.status === "OPEN" && computation.remainingLitres > 0) {
-    return !isEligibleForNewCycle(computation, asOf, timezone);
-  }
-
-  if (computation.status === "COMPLETED") {
-    return isEligibleForNewCycle(computation, asOf, timezone);
-  }
-
-  return false;
+  return (
+    computation.status === "OPEN" &&
+    computation.remainingLitres > 0 &&
+    !isEligibleForNewCycle(computation, asOf, timezone)
+  );
 }

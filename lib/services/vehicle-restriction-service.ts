@@ -2,7 +2,7 @@ import { getDaysInMonth } from "date-fns";
 import type { PlateParity } from "@/lib/db";
 import { addAppDays, getAppDayOfMonth, parseAppDateInput, startOfAppDay } from "@/lib/timezone";
 
-export function isOddDay(day: number): boolean {
+function isOddDay(day: number): boolean {
   return day % 2 === 1;
 }
 
@@ -43,7 +43,7 @@ export function getDrivingDaysInMonth(
   return allowed;
 }
 
-export type CalendarDayStatus = {
+type CalendarDayStatus = {
   date: Date;
   drivingAllowed: boolean;
   petrolRefillAvailable: boolean;

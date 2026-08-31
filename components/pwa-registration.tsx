@@ -8,9 +8,7 @@ export function PwaRegistration() {
       return;
     }
 
-    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {
-      // Installation should still work with the manifest if registration is unavailable.
-    });
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => undefined);
   }, []);
 
   return null;

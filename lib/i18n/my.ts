@@ -1,4 +1,3 @@
-/** Burmese UI copy. Brand title "Litre Log" stays English everywhere. */
 export const my = {
   brand: {
     title: "Litre Log",
@@ -158,8 +157,6 @@ export const my = {
     pageNotFound: "တောင်းဆိုထားသော စာမျက်နှာကို မတွေ့ပါ။",
   },
 } as const;
-
-export type MessageKey = keyof typeof my.errors;
 
 export function parityLabelMy(parity: "ODD" | "EVEN") {
   return my.parity[parity];

@@ -3,10 +3,6 @@ import { addMonths, getDaysInMonth } from "date-fns";
 
 export const APP_TIMEZONE = "Asia/Yangon";
 
-export function toAppDate(date: Date, timezone = APP_TIMEZONE): Date {
-  return toZonedTime(date, timezone);
-}
-
 export function startOfAppDay(date: Date, timezone = APP_TIMEZONE): Date {
   const zoned = toZonedTime(date, timezone);
   zoned.setHours(0, 0, 0, 0);

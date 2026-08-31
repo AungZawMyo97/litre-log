@@ -30,10 +30,11 @@ export async function syncDailyNotifications(userId: string, asOf = new Date()) 
           parityLabelMy(vehicle.plateParity),
         ),
         asOf,
+        timezone,
       });
     }
 
-    const summary = await getVehiclePetrolSummary(vehicle.id, userId);
+    const summary = await getVehiclePetrolSummary(vehicle.id, userId, asOf);
 
     if (summary.status === "OPEN" && summary.remainingLitres > 0 && summary.drivingAllowed) {
       await upsertNotification({
@@ -43,6 +44,7 @@ export async function syncDailyNotifications(userId: string, asOf = new Date()) 
         title: my.notifications.petrolRemainingTitle,
         message: my.notifications.petrolRemainingMsg(summary.remainingLitres, vehicle.name),
         asOf,
+        timezone,
       });
     }
 
@@ -54,6 +56,7 @@ export async function syncDailyNotifications(userId: string, asOf = new Date()) 
         title: my.notifications.petrolEligibleTitle,
         message: my.notifications.petrolEligibleMsg(vehicle.name, vehicle.licensePlate),
         asOf,
+        timezone,
       });
     }
   }
@@ -66,10 +69,10 @@ async function upsertNotification(input: {
   title: string;
   message: string;
   asOf: Date;
+  timezone: string;
 }) {
-  const timezone = await getAppTimezone();
-  const dayStart = startOfAppDay(input.asOf, timezone);
-  const notificationDate = formatAppDateInput(dayStart, timezone);
+  const dayStart = startOfAppDay(input.asOf, input.timezone);
+  const notificationDate = formatAppDateInput(dayStart, input.timezone);
 
   const [existing] = await db
     .select()

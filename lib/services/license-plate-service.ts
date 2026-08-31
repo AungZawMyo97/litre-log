@@ -28,7 +28,7 @@ export function normalizePlate(raw: string): string {
     .toUpperCase();
 }
 
-export function extractNumericSequences(plate: string): string[] {
+function extractNumericSequences(plate: string): string[] {
   const normalized = normalizePlate(plate);
   const matches = normalized.match(/\d+/g);
   return matches ?? [];

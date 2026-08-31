@@ -3,7 +3,7 @@ import { db, petrolCycles, petrolTransactions, type PetrolTransaction } from "@/
 import { my } from "@/lib/i18n/my";
 import { getAppTimezone, getNumericSetting } from "@/lib/settings";
 import {
-  canRecordTransaction,
+  canUseCurrentAllocation,
   computeCycleState,
   isEligibleForNewCycle,
   type CycleComputation,
@@ -16,6 +16,7 @@ import {
   loadCycleTransactions,
   loadCycleWithTransactions,
   lockOwnedActiveVehicle,
+  type TxClient,
   type CycleWithTransactions,
 } from "@/lib/services/petrol-cycle-repository";
 import type { VehiclePetrolSummary } from "@/lib/services/petrol-summary";
@@ -50,6 +51,46 @@ function mapTransactions(transactions: PetrolTransaction[]) {
     litres: transaction.litres,
     transactionAt: transaction.transactionAt,
   }));
+}
+
+async function createOpenCycle(
+  vehicleId: string,
+  allowedLitres: number,
+  tx: TxClient,
+): Promise<CycleWithTransactions> {
+  const [cycle] = await tx
+    .insert(petrolCycles)
+    .values({
+      vehicleId,
+      cycleNumber: await getNextCycleNumber(vehicleId, tx),
+      allowedLitres,
+      status: "OPEN",
+    })
+    .returning();
+
+  return { ...cycle, transactions: [] };
+}
+
+async function closeExpiredCycle(
+  cycle: CycleWithTransactions,
+  computation: CycleComputation,
+  tx: TxClient,
+): Promise<void> {
+  const [closed] = await tx
+    .update(petrolCycles)
+    .set({
+      status: computation.status === "COMPLETED" ? "COMPLETED" : "SUPERSEDED",
+      completedAt: computation.completedAt,
+      nextEligibleAt: computation.nextEligibleAt,
+      version: cycle.version + 1,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(petrolCycles.id, cycle.id), eq(petrolCycles.version, cycle.version)))
+    .returning({ id: petrolCycles.id });
+
+  if (!closed) {
+    throw new PetrolCycleError(my.errors.concurrentUpdate, 409, "CONCURRENT_UPDATE");
+  }
 }
 
 function assertTransactionDate(
@@ -117,21 +158,9 @@ export async function recordPetrolTransaction(input: RecordPetrolInput) {
     }
 
     const existingCycle = await findCurrentCycle(input.vehicleId, tx);
-    let cycle: CycleWithTransactions;
-    if (!existingCycle) {
-      const [created] = await tx
-        .insert(petrolCycles)
-        .values({
-          vehicleId: input.vehicleId,
-          cycleNumber: await getNextCycleNumber(input.vehicleId, tx),
-          allowedLitres,
-          status: "OPEN",
-        })
-        .returning();
-      cycle = { ...created, transactions: [] };
-    } else {
-      cycle = await loadCycleWithTransactions(existingCycle, tx);
-    }
+    let cycle = existingCycle
+      ? await loadCycleWithTransactions(existingCycle, tx)
+      : await createOpenCycle(input.vehicleId, allowedLitres, tx);
 
     let computation = computeCycleState(
       cycle.allowedLitres,
@@ -142,35 +171,12 @@ export async function recordPetrolTransaction(input: RecordPetrolInput) {
     assertTransactionDate(input.transactionAt, asOf, timezone, computation.cycleStartedAt);
 
     if (isEligibleForNewCycle(computation, input.transactionAt, timezone)) {
-      const [closed] = await tx
-        .update(petrolCycles)
-        .set({
-          status: computation.status === "COMPLETED" ? "COMPLETED" : "SUPERSEDED",
-          completedAt: computation.completedAt,
-          nextEligibleAt: computation.nextEligibleAt,
-          version: cycle.version + 1,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(petrolCycles.id, cycle.id), eq(petrolCycles.version, cycle.version)))
-        .returning({ id: petrolCycles.id });
-      if (!closed) {
-        throw new PetrolCycleError(my.errors.concurrentUpdate, 409, "CONCURRENT_UPDATE");
-      }
-
-      const [created] = await tx
-        .insert(petrolCycles)
-        .values({
-          vehicleId: input.vehicleId,
-          cycleNumber: await getNextCycleNumber(input.vehicleId, tx),
-          allowedLitres,
-          status: "OPEN",
-        })
-        .returning();
-      cycle = { ...created, transactions: [] };
+      await closeExpiredCycle(cycle, computation, tx);
+      cycle = await createOpenCycle(input.vehicleId, allowedLitres, tx);
       computation = computeCycleState(cycle.allowedLitres, [], cycleIntervalDays, timezone);
     }
 
-    if (!canRecordTransaction(computation, input.transactionAt, timezone)) {
+    if (!canUseCurrentAllocation(computation, input.transactionAt, timezone)) {
       throw new PetrolCycleError(my.errors.notEligiblePetrol, 422, "NOT_ELIGIBLE");
     }
     const validation = validateTransactionLitres(input.litres, computation.remainingLitres);
