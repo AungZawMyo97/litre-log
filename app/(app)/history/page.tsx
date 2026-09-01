@@ -27,37 +27,40 @@ export default async function HistoryPage() {
   );
 
   return (
-    <div className="space-y-7">
-      <div>
-        <h1 className="font-display text-3xl font-bold leading-relaxed text-[var(--hero)]">{my.history.title}</h1>
+    <div className="page-shell space-y-9">
+      <div className="page-heading">
+        <p className="eyebrow">CYCLE ARCHIVE</p>
+        <h1 className="mt-2 font-display text-3xl font-bold leading-relaxed text-[var(--hero)] sm:text-[2.15rem]">{my.history.title}</h1>
         <p className="mt-1 max-w-3xl text-[var(--muted)]">{my.history.desc}</p>
       </div>
 
       {histories.map(({ vehicle, history }) => (
         <section key={vehicle.id} className="space-y-4">
-          <h2 className="text-xl font-bold text-[var(--hero)]">
-            {vehicle.name} - {vehicle.licensePlate}
-          </h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[var(--line-strong)] pb-3">
+            <h2 className="text-xl font-bold text-[var(--hero)]">{vehicle.name}</h2>
+            <span className="eyebrow">{vehicle.licensePlate}</span>
+          </div>
           {history.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">{my.history.noCycles}</p>
+            <p className="empty-state text-sm text-[var(--muted)]">{my.history.noCycles}</p>
           ) : (
-            history.map(({ cycle, computation }) => (
-              <article key={cycle.id} className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5 shadow-[var(--shadow-card)] sm:p-6">
-                <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="grid gap-4 lg:grid-cols-2">
+              {history.map(({ cycle, computation }) => (
+              <article key={cycle.id} className="surface-panel p-5 sm:p-6">
+                <div className="mb-5 flex items-center justify-between gap-3">
                   <h3 className="text-lg font-bold">{my.history.cycle(cycle.cycleNumber)}</h3>
-                  <span className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-3 py-1 text-sm font-bold text-[var(--muted)]">
+                  <span className="rounded-full border border-[var(--line)] bg-[var(--surface-deep)] px-3 py-1 text-xs font-bold text-[var(--muted)]">
                     {my.status[cycle.status]}
                   </span>
                 </div>
-                <ul className="space-y-2 text-base">
+                <ul className="divide-y divide-[var(--line)] text-base">
                   {cycle.transactions.map((tx) => (
-                    <li key={tx.id} className="flex justify-between gap-4 rounded-lg py-1">
+                    <li key={tx.id} className="flex justify-between gap-4 py-2.5">
                       <span>{formatAppDate(tx.transactionAt, timezone)}</span>
                       <span className="font-bold tabular-nums">{tx.litres} L</span>
                     </li>
                   ))}
                 </ul>
-                <div className="mt-4 grid gap-2 border-t border-[var(--line)] pt-4 text-base">
+                <div className="mt-4 grid gap-2.5 rounded-xl bg-[var(--accent-soft)]/55 p-4 text-sm">
                   <div className="flex justify-between">
                     <span className="text-[var(--muted)]">{my.history.total}</span>
                     <span className="font-bold tabular-nums">{computation.totalTaken} L</span>
@@ -76,7 +79,8 @@ export default async function HistoryPage() {
                   ) : null}
                 </div>
               </article>
-            ))
+              ))}
+            </div>
           )}
         </section>
       ))}

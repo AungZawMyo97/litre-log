@@ -16,9 +16,9 @@ export default function AppError({
 
   return (
     <main className="mx-auto grid min-h-dvh max-w-lg place-items-center px-4">
-      <div className="w-full rounded-2xl border border-[var(--line)] bg-[var(--card)] p-8 text-center shadow-[var(--shadow-card)]">
+      <div className="surface-panel w-full p-8 text-center">
         <h1 className="font-display text-2xl font-bold text-[var(--hero)]">{my.errors.unexpected}</h1>
-        <button type="button" onClick={retry} className="mt-6 min-h-12 rounded-xl bg-[var(--accent)] px-6 font-bold text-white hover:bg-[var(--accent-hover)]">
+        <button type="button" onClick={retry} className="button-primary mt-6">
           {my.common.retry}
         </button>
       </div>

@@ -55,7 +55,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             disabled={busy}
-            className="min-h-14 w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 text-lg shadow-sm disabled:bg-[var(--surface)] disabled:opacity-75"
+            className="field text-lg"
             placeholder={my.auth.optional}
           />
         </label>
@@ -69,7 +69,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={busy}
-          className="min-h-14 w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 text-lg shadow-sm disabled:bg-[var(--surface)] disabled:opacity-75"
+          className="field text-lg"
         />
       </label>
 
@@ -81,16 +81,16 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           disabled={busy}
-          className="min-h-14 w-full rounded-xl border border-[var(--line-strong)] bg-white px-4 text-lg shadow-sm disabled:bg-[var(--surface)] disabled:opacity-75"
+          className="field text-lg"
         />
       </label>
 
-      {error ? <p role="alert" className="rounded-xl bg-[var(--bad-soft)] p-3 font-semibold text-[var(--bad)]">{error}</p> : null}
+      {error ? <p role="alert" className="rounded-xl border border-[var(--bad)]/15 bg-[var(--bad-soft)] p-3 font-semibold text-[var(--bad)]">{error}</p> : null}
 
       <button
         type="submit"
         disabled={busy}
-        className="min-h-14 w-full rounded-xl bg-[var(--accent)] px-5 py-3 font-bold text-white shadow-sm hover:bg-[var(--accent-hover)] disabled:opacity-60"
+        className="button-primary min-h-14 w-full"
       >
         {busy ? my.common.pleaseWait : mode === "login" ? my.auth.signIn : my.auth.signUp}
       </button>

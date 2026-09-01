@@ -53,10 +53,11 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
   );
 
   return (
-    <div className="space-y-7">
+    <div className="page-shell space-y-8">
       <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold leading-relaxed text-[var(--hero)]">{my.calendar.title}</h1>
+        <div className="page-heading">
+          <p className="eyebrow">DRIVING PLANNER</p>
+          <h1 className="mt-2 font-display text-3xl font-bold leading-relaxed text-[var(--hero)] sm:text-[2.15rem]">{my.calendar.title}</h1>
           <p className="mt-1 text-base text-[var(--muted)]">
             {formatAppMonthYear(anchor, timezone)} {my.calendar.descSuffix}
           </p>
@@ -65,32 +66,35 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
           <Link
             href={monthHref(addAppMonths(anchor, -1, timezone), timezone)}
             aria-label={my.common.previous}
-            className="grid min-h-12 min-w-12 place-items-center rounded-xl border border-[var(--line-strong)] bg-[var(--card)] text-[var(--hero)] shadow-sm hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]"
+            className="button-secondary min-w-12 px-0"
           >
             <ArrowLeftIcon className="h-6 w-6" />
           </Link>
           <Link
             href={monthHref(addAppMonths(anchor, 1, timezone), timezone)}
             aria-label={my.common.next}
-            className="grid min-h-12 min-w-12 place-items-center rounded-xl border border-[var(--line-strong)] bg-[var(--card)] text-[var(--hero)] shadow-sm hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]"
+            className="button-secondary min-w-12 px-0"
           >
             <ArrowRightIcon className="h-6 w-6" />
           </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
-        <span className="rounded-xl border border-[var(--ok)]/25 bg-[var(--ok-soft)] px-3 py-2.5 font-bold text-[var(--ok)]">✓ {my.calendar.drivingAllowed}</span>
-        <span className="rounded-xl border border-[var(--bad)]/25 bg-[var(--bad-soft)] px-3 py-2.5 font-bold text-[var(--bad)]">× {my.calendar.drivingRestricted}</span>
-        <span className="rounded-xl border-2 border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-2.5 font-bold text-[var(--hero)]">{my.calendar.petrolAvailable}</span>
-        <span className="rounded-xl border-2 border-dashed border-[var(--accent)] bg-[var(--card)] px-3 py-2.5 font-bold text-[var(--hero)]">{my.calendar.cycleIncomplete}</span>
-        <span className="rounded-xl border-2 border-[var(--ink)] bg-[var(--card)] px-3 py-2.5 font-bold">{my.calendar.today}</span>
+      <div className="surface-panel flex flex-wrap gap-x-5 gap-y-3 px-4 py-3.5 text-sm">
+        <span className="flex items-center gap-2 font-bold text-[var(--ok)]"><i aria-hidden="true" className="h-3 w-3 rounded-full bg-[var(--ok)]" />{my.calendar.drivingAllowed}</span>
+        <span className="flex items-center gap-2 font-bold text-[var(--bad)]"><i aria-hidden="true" className="h-3 w-3 rounded-full bg-[var(--bad)]" />{my.calendar.drivingRestricted}</span>
+        <span className="flex items-center gap-2 font-bold text-[var(--hero)]"><i aria-hidden="true" className="h-3 w-3 rounded-sm border-2 border-[var(--accent)] bg-[var(--accent-soft)]" />{my.calendar.petrolAvailable}</span>
+        <span className="flex items-center gap-2 font-bold text-[var(--hero)]"><i aria-hidden="true" className="h-3 w-3 rounded-sm border-2 border-dashed border-[var(--accent)]" />{my.calendar.cycleIncomplete}</span>
+        <span className="flex items-center gap-2 font-bold"><i aria-hidden="true" className="h-3 w-3 rounded-sm border-2 border-[var(--ink)] bg-white" />{my.calendar.today}</span>
       </div>
 
       {vehicleCalendars.map(({ vehicle, days }) => (
-        <section key={vehicle.id} className="space-y-4 rounded-2xl border border-[var(--line)] bg-white p-4 shadow-[var(--shadow-card)] sm:p-6">
-          <h2 className="text-xl font-bold text-[var(--hero)]">{vehicle.name} - {vehicle.licensePlate}</h2>
-          <div className="grid grid-cols-7 gap-1.5">
+        <section key={vehicle.id} className="surface-panel space-y-5 p-4 sm:p-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[var(--line)] pb-3">
+            <h2 className="text-xl font-bold text-[var(--hero)]">{vehicle.name}</h2>
+            <span className="eyebrow">{vehicle.licensePlate}</span>
+          </div>
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
             {days.map((day) => {
               const dayNum = getAppDayOfMonth(day.date, timezone);
               const isToday = isSameAppDay(day.date, today, timezone);
@@ -105,7 +109,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                 <div
                   key={day.date.toISOString()}
                   aria-label={`${dayNum}, ${day.drivingAllowed ? my.calendar.drivingAllowed : my.calendar.drivingRestricted}`}
-                  className={`grid min-h-12 place-items-center rounded-lg border-2 p-1 text-center text-base font-extrabold tabular-nums ${tone} ${petrolTone} ${day.petrolCycleCompleted ? "ring-2 ring-[var(--accent)]" : ""} ${isToday ? "ring-2 ring-[var(--ink)] ring-offset-2" : ""}`}
+                  className={`grid min-h-12 place-items-center rounded-xl border-2 p-1 text-center text-base font-extrabold tabular-nums sm:min-h-14 ${tone} ${petrolTone} ${day.petrolCycleCompleted ? "ring-2 ring-[var(--accent)]" : ""} ${isToday ? "ring-2 ring-[var(--ink)] ring-offset-2" : ""}`}
                 >
                   {dayNum}
                 </div>

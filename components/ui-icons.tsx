@@ -39,3 +39,7 @@ export function ArrowLeftIcon(props: IconProps) {
 export function ArrowRightIcon(props: IconProps) {
   return <svg {...iconProps} {...props}><path d="m9 18 6-6-6-6" /></svg>;
 }
+
+export function LogoutIcon(props: IconProps) {
+  return <svg {...iconProps} {...props}><path d="M10 17l5-5-5-5M15 12H3" /><path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5" /></svg>;
+}

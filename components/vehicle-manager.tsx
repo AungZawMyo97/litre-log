@@ -59,44 +59,50 @@ export function VehicleManager({ initialVehicles }: { initialVehicles: VehicleIt
   }
 
   return (
-    <div className="space-y-3">
-      {error ? <p role="alert" className="rounded-xl bg-[var(--bad-soft)] p-3 font-semibold text-[var(--bad)]">{error}</p> : null}
+    <div className="space-y-4">
+      {error ? <p role="alert" className="rounded-xl border border-[var(--bad)]/15 bg-[var(--bad-soft)] p-3 font-semibold text-[var(--bad)]">{error}</p> : null}
       {items.map((vehicle) => (
-        <article key={vehicle.id} className="rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5 shadow-[var(--shadow-card)] sm:p-6">
+        <article key={vehicle.id} className="surface-panel relative overflow-hidden p-5 sm:p-6">
+          <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-[var(--accent)]/70" />
           {editingId === vehicle.id ? (
             <div className="grid gap-4">
-              <h2 className="text-xl font-bold text-[var(--hero)]">{my.vehicle.editVehicle}</h2>
+              <div>
+                <p className="eyebrow">EDIT VEHICLE</p>
+                <h2 className="mt-2 text-xl font-bold text-[var(--hero)]">{my.vehicle.editVehicle}</h2>
+              </div>
               <label className="grid gap-2">
                 <span className="font-semibold text-[var(--muted)]">{my.vehicle.nameLabel}</span>
-                <input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} disabled={pending} className="min-h-14 rounded-xl border border-[var(--line-strong)] px-4 text-lg shadow-sm" />
+                <input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} disabled={pending} className="field text-lg" />
               </label>
               <label className="grid gap-2">
                 <span className="font-semibold text-[var(--muted)]">{my.vehicle.plateLabel}</span>
-                <input value={draft.licensePlate} onChange={(event) => setDraft((current) => ({ ...current, licensePlate: event.target.value }))} disabled={pending} className="min-h-14 rounded-xl border border-[var(--line-strong)] px-4 text-lg shadow-sm" />
+                <input value={draft.licensePlate} onChange={(event) => setDraft((current) => ({ ...current, licensePlate: event.target.value }))} disabled={pending} className="field text-lg" />
               </label>
               <label className="grid gap-2">
                 <span className="font-semibold text-[var(--muted)]">{my.vehicle.parityLabel}</span>
-                <select value={draft.plateParity} onChange={(event) => setDraft((current) => ({ ...current, plateParity: event.target.value as "ODD" | "EVEN" }))} disabled={pending} className="min-h-14 rounded-xl border border-[var(--line-strong)] bg-white px-4 text-lg shadow-sm">
+                <select value={draft.plateParity} onChange={(event) => setDraft((current) => ({ ...current, plateParity: event.target.value as "ODD" | "EVEN" }))} disabled={pending} className="field text-lg">
                   <option value="ODD">{my.vehicle.odd}</option>
                   <option value="EVEN">{my.vehicle.even}</option>
                 </select>
               </label>
               <div className="flex flex-wrap gap-2">
-                <button type="button" disabled={pending || !draft.name.trim() || !draft.licensePlate.trim()} onClick={() => save(vehicle.id)} className="min-h-12 rounded-xl bg-[var(--accent)] px-5 font-bold text-white hover:bg-[var(--accent-hover)] disabled:opacity-60">{my.vehicle.updateVehicle}</button>
-                <button type="button" disabled={pending} onClick={() => setEditingId(null)} className="min-h-12 rounded-xl border border-[var(--line-strong)] px-5 font-bold hover:bg-[var(--surface)]">{my.common.cancel}</button>
+                <button type="button" disabled={pending || !draft.name.trim() || !draft.licensePlate.trim()} onClick={() => save(vehicle.id)} className="button-primary">{my.vehicle.updateVehicle}</button>
+                <button type="button" disabled={pending} onClick={() => setEditingId(null)} className="button-secondary">{my.common.cancel}</button>
               </div>
             </div>
           ) : (
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-xl font-bold text-[var(--hero)]">{vehicle.name}</h2>
-                <p className="mt-1.5 text-base font-medium text-[var(--muted)]">
-                  {vehicle.licensePlate} - {parityLabelMy(vehicle.plateParity)} - {vehicle.paritySource === "manual" ? my.vehicle.manual : my.vehicle.auto}
-                </p>
+                <p className="eyebrow">{vehicle.licensePlate}</p>
+                <h2 className="mt-2 text-xl font-bold text-[var(--hero)]">{vehicle.name}</h2>
+                <div className="mt-2 flex flex-wrap gap-2 text-sm font-semibold text-[var(--muted)]">
+                  <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-[var(--accent)]">{parityLabelMy(vehicle.plateParity)}</span>
+                  <span className="rounded-full bg-[var(--surface-deep)] px-3 py-1">{vehicle.paritySource === "manual" ? my.vehicle.manual : my.vehicle.auto}</span>
+                </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button type="button" disabled={pending} onClick={() => beginEdit(vehicle)} className="min-h-12 rounded-xl border border-[var(--line-strong)] bg-white px-5 font-bold hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]">{my.common.edit}</button>
-                <button type="button" disabled={pending} onClick={() => archive(vehicle.id)} className="min-h-12 rounded-xl border border-[var(--bad)]/60 bg-white px-5 font-bold text-[var(--bad)] hover:bg-[var(--bad-soft)]">{my.common.archive}</button>
+                <button type="button" disabled={pending} onClick={() => beginEdit(vehicle)} className="button-secondary">{my.common.edit}</button>
+                <button type="button" disabled={pending} onClick={() => archive(vehicle.id)} className="button-danger">{my.common.archive}</button>
               </div>
             </div>
           )}

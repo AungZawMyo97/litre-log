@@ -1,4 +1,4 @@
-const CACHE_NAME = "litre-log-static-v1";
+const CACHE_NAME = "litre-log-static-v2";
 const STATIC_ASSETS = [
   "/",
   "/icon-192x192.png",

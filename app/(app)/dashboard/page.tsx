@@ -18,25 +18,35 @@ export default async function DashboardPage() {
   const todayInput = formatAppDateInput(now, timezone);
 
   return (
-    <div className="space-y-7">
-      <section className="relative overflow-hidden rounded-2xl bg-[var(--hero)] px-5 py-7 text-white shadow-[0_16px_38px_rgba(24,59,91,0.18)] sm:px-7 sm:py-8">
-        <div aria-hidden="true" className="absolute -right-12 -top-20 h-52 w-52 rounded-full border-[34px] border-white/5" />
-        <div className="relative">
-        <p className="text-sm font-extrabold uppercase tracking-[0.12em] text-white/75">{my.dashboard.today}</p>
-        <h1 className="mt-2 font-display text-2xl font-bold leading-relaxed sm:text-3xl">{getTodayHeading(now, timezone)}</h1>
-        <p className="mt-3 max-w-2xl leading-8 text-white/90">{my.dashboard.tagline}</p>
+    <div className="page-shell space-y-8">
+      <section className="surface-panel relative overflow-hidden sm:grid sm:grid-cols-[minmax(0,1.45fr)_minmax(13rem,0.55fr)]">
+        <div className="relative px-5 py-7 sm:px-8 sm:py-9">
+          <p className="eyebrow">{my.dashboard.today}</p>
+          <h1 className="mt-3 max-w-2xl font-display text-[1.75rem] font-bold leading-[1.65] text-[var(--hero)] sm:text-[2.15rem]">
+            {getTodayHeading(now, timezone)}
+          </h1>
+          <p className="mt-3 max-w-2xl text-[var(--muted)] sm:text-[1.05rem]">{my.dashboard.tagline}</p>
+        </div>
+        <div className="relative hidden min-h-56 overflow-hidden bg-[var(--nav)] p-7 text-white sm:flex sm:flex-col sm:justify-between">
+          <div aria-hidden="true" className="absolute -right-16 -top-14 h-52 w-52 rounded-full border-[32px] border-white/[0.045]" />
+          <p className="relative font-serif text-sm font-bold tracking-[0.22em] text-white/55">LITRE / LOG</p>
+          <div aria-hidden="true" className="relative space-y-3">
+            {["w-full", "w-4/5", "w-3/5", "w-2/5"].map((width) => (
+              <div key={width} className={`h-px ${width} bg-white/25`} />
+            ))}
+          </div>
         </div>
       </section>
 
       {vehicles.length === 0 ? (
-        <div className="rounded-2xl border-2 border-dashed border-[var(--line)] bg-[var(--card)] p-8 text-center shadow-[var(--shadow-card)]">
+        <div className="empty-state">
           <p className="text-[var(--muted)]">{my.dashboard.noVehicles}</p>
-          <Link href="/vehicles" className="mt-5 inline-grid min-h-12 place-items-center rounded-xl bg-[var(--accent)] px-6 py-3 font-bold text-white hover:bg-[var(--accent-hover)]">
+          <Link href="/vehicles" className="button-primary mt-5">
             {my.dashboard.addFirstVehicle}
           </Link>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {vehicles.map((vehicle) => (
             <VehicleCard key={vehicle.id} vehicle={vehicle} todayInput={todayInput} timezone={timezone} />
           ))}

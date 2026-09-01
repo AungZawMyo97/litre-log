@@ -16,9 +16,10 @@ export default async function NotificationsPage() {
   ]);
 
   return (
-    <div className="space-y-7">
-      <div>
-        <h1 className="font-display text-3xl font-bold leading-relaxed text-[var(--hero)]">{my.notifications.title}</h1>
+    <div className="page-shell space-y-8">
+      <div className="page-heading">
+        <p className="eyebrow">DAILY SIGNALS</p>
+        <h1 className="mt-2 font-display text-3xl font-bold leading-relaxed text-[var(--hero)] sm:text-[2.15rem]">{my.notifications.title}</h1>
         <p className="mt-1 max-w-2xl text-[var(--muted)]">{my.notifications.desc}</p>
       </div>
 
