@@ -76,16 +76,15 @@ export function CalendarSkeleton() {
   return (
     <div className="page-shell space-y-6" aria-label="Loading calendar">
       <PageHeadingSkeleton />
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <SkeletonLine key={index} className="h-10" />
-        ))}
+      <div className="calendar-toolbar">
+        <SkeletonLine className="h-12 w-56" />
+        <SkeletonLine className="h-12 w-44" />
       </div>
-      <section className="space-y-3">
-        <SkeletonLine className="h-7 w-52" />
-        <div className="grid grid-cols-7 gap-1">
-          {Array.from({ length: 35 }).map((_, index) => (
-            <SkeletonLine key={index} className="min-h-11" />
+      <section className="surface-panel space-y-3 overflow-hidden p-4">
+        <SkeletonLine className="h-8 w-52" />
+        <div className="grid grid-cols-7 gap-px">
+          {Array.from({ length: 42 }).map((_, index) => (
+            <SkeletonLine key={index} className={index < 7 ? "h-10" : "h-20 sm:h-26"} />
           ))}
         </div>
       </section>

@@ -1,37 +1,18 @@
 import Link from "next/link";
+import { and, asc, eq } from "drizzle-orm";
 import { getSessionUser } from "@/lib/auth";
 import { db, vehicles } from "@/lib/db";
-import { and, asc, eq } from "drizzle-orm";
 import { my } from "@/lib/i18n/my";
 import { getAppTimezone } from "@/lib/settings";
 import { getVehicleCalendar } from "@/lib/services/vehicle-calendar-service";
-import {
-  addAppMonths,
-  formatAppDateInput,
-  formatAppMonthYear,
-  getAppDayOfMonth,
-  isSameAppDay,
-  parseAppDateInput,
-  startOfAppDay,
-} from "@/lib/timezone";
+import { formatAppMonthYear, getTodayHeading, startOfAppDay } from "@/lib/timezone";
 import { ArrowLeftIcon, ArrowRightIcon } from "@/components/ui-icons";
+import { calendarMonthHref, getCalendarMonth } from "./calendar-month";
+import { MonthCalendar } from "./month-calendar";
 
 type CalendarPageProps = {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string | string[] }>;
 };
-
-function monthHref(date: Date, timezone: string) {
-  return `/calendar?month=${formatAppDateInput(date, timezone).slice(0, 7)}`;
-}
-
-function parseMonth(month: string | undefined, timezone: string) {
-  if (!month || !/^\d{4}-\d{2}$/.test(month)) return new Date();
-  try {
-    return parseAppDateInput(`${month}-01`, timezone);
-  } catch {
-    return new Date();
-  }
-}
 
 export default async function CalendarPage({ searchParams }: CalendarPageProps) {
   const user = await getSessionUser();
@@ -40,84 +21,73 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
   const [{ month }, timezone, userVehicles] = await Promise.all([
     searchParams,
     getAppTimezone(),
-    db
-      .select()
-      .from(vehicles)
+    db.select().from(vehicles)
       .where(and(eq(vehicles.userId, user.id), eq(vehicles.isActive, true)))
       .orderBy(asc(vehicles.createdAt)),
   ]);
-  const anchor = parseMonth(month, timezone);
-  const today = startOfAppDay(new Date(), timezone);
+  const now = new Date();
+  const anchor = getCalendarMonth(month, timezone, now);
+  const today = startOfAppDay(now, timezone);
+  const monthTitle = formatAppMonthYear(anchor, timezone);
   const vehicleCalendars = await Promise.all(
-    userVehicles.map((vehicle) => getVehicleCalendar(vehicle.id, user.id, anchor)),
+    userVehicles.map((vehicle) => getVehicleCalendar(vehicle.id, user.id, anchor, now)),
   );
 
   return (
-    <div className="page-shell space-y-8">
-      <div className="flex items-center justify-between gap-4">
-        <div className="page-heading">
-          <p className="eyebrow">DRIVING PLANNER</p>
-          <h1 className="mt-2 font-display text-3xl font-bold leading-relaxed text-[var(--hero)] sm:text-[2.15rem]">{my.calendar.title}</h1>
-          <p className="mt-1 text-base text-[var(--muted)]">
-            {formatAppMonthYear(anchor, timezone)} {my.calendar.descSuffix}
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <Link
-            href={monthHref(addAppMonths(anchor, -1, timezone), timezone)}
-            aria-label={my.common.previous}
-            className="button-secondary min-w-12 px-0"
-          >
-            <ArrowLeftIcon className="h-6 w-6" />
-          </Link>
-          <Link
-            href={monthHref(addAppMonths(anchor, 1, timezone), timezone)}
-            aria-label={my.common.next}
-            className="button-secondary min-w-12 px-0"
-          >
-            <ArrowRightIcon className="h-6 w-6" />
-          </Link>
-        </div>
-      </div>
+    <div className="page-shell space-y-6">
+      <header className="page-heading">
+        <p className="eyebrow">DRIVING PLANNER</p>
+        <h1 className="mt-2 font-display text-3xl font-bold leading-relaxed text-[var(--hero)]">{my.calendar.title}</h1>
+        <p className="mt-1 text-[var(--muted)]">{my.calendar.description}</p>
+      </header>
 
-      <div className="surface-panel flex flex-wrap gap-x-5 gap-y-3 px-4 py-3.5 text-sm">
-        <span className="flex items-center gap-2 font-bold text-[var(--ok)]"><i aria-hidden="true" className="h-3 w-3 rounded-full bg-[var(--ok)]" />{my.calendar.drivingAllowed}</span>
-        <span className="flex items-center gap-2 font-bold text-[var(--bad)]"><i aria-hidden="true" className="h-3 w-3 rounded-full bg-[var(--bad)]" />{my.calendar.drivingRestricted}</span>
-        <span className="flex items-center gap-2 font-bold text-[var(--hero)]"><i aria-hidden="true" className="h-3 w-3 rounded-sm border-2 border-[var(--accent)] bg-[var(--accent-soft)]" />{my.calendar.petrolAvailable}</span>
-        <span className="flex items-center gap-2 font-bold text-[var(--hero)]"><i aria-hidden="true" className="h-3 w-3 rounded-sm border-2 border-dashed border-[var(--accent)]" />{my.calendar.cycleIncomplete}</span>
-        <span className="flex items-center gap-2 font-bold"><i aria-hidden="true" className="h-3 w-3 rounded-sm border-2 border-[var(--ink)] bg-white" />{my.calendar.today}</span>
-      </div>
+      <section className="calendar-toolbar" aria-label={my.calendar.title}>
+        <div>
+          <h2 className="font-serif text-3xl leading-tight text-[var(--hero)] sm:text-4xl">{monthTitle}</h2>
+          <p className="mt-2 text-sm text-[var(--muted)]">{my.calendar.today} · {getTodayHeading(today, timezone)}</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">{timezone}</p>
+        </div>
+        <nav className="flex items-center gap-2" aria-label={my.calendar.currentMonth}>
+          <Link href={calendarMonthHref(anchor, timezone, -1)} aria-label={my.calendar.previousMonth} className="button-secondary min-w-12 px-0">
+            <ArrowLeftIcon className="h-5 w-5" />
+          </Link>
+          <Link href="/calendar" className="button-secondary">{my.calendar.currentMonth}</Link>
+          <Link href={calendarMonthHref(anchor, timezone, 1)} aria-label={my.calendar.nextMonth} className="button-secondary min-w-12 px-0">
+            <ArrowRightIcon className="h-5 w-5" />
+          </Link>
+        </nav>
+      </section>
+
+      {vehicleCalendars.length > 0 ? (
+        <ul className="calendar-legend">
+          <li><span aria-hidden="true" className="calendar-driving is-allowed">✓</span>{my.calendar.drivingAllowed}</li>
+          <li><span aria-hidden="true" className="calendar-driving is-restricted">−</span>{my.calendar.drivingRestricted}</li>
+          <li><span aria-hidden="true" className="calendar-fuel">●</span>{my.calendar.petrolAvailable}</li>
+          <li><span aria-hidden="true" className="calendar-incomplete">○</span>{my.calendar.cycleIncomplete}</li>
+          <li><span aria-hidden="true" className="calendar-completed">◆</span>{my.calendar.cycleCompleted}</li>
+          <li><span aria-hidden="true" className="calendar-today-key" />{my.calendar.today}</li>
+        </ul>
+      ) : null}
 
       {vehicleCalendars.map(({ vehicle, days }) => (
-        <section key={vehicle.id} className="surface-panel space-y-5 p-4 sm:p-6">
-          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[var(--line)] pb-3">
-            <h2 className="text-xl font-bold text-[var(--hero)]">{vehicle.name}</h2>
-            <span className="eyebrow">{vehicle.licensePlate}</span>
+        <section key={vehicle.id} className="surface-panel overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-5 sm:px-6">
+            <h2 className="text-xl font-semibold text-[var(--hero)]">{vehicle.name}</h2>
+            <span className="rounded-md border px-2.5 py-1 text-sm font-semibold tracking-wider text-[var(--muted)]">{vehicle.licensePlate}</span>
           </div>
-          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-            {days.map((day) => {
-              const dayNum = getAppDayOfMonth(day.date, timezone);
-              const isToday = isSameAppDay(day.date, today, timezone);
-              const tone = day.drivingAllowed ? "bg-[var(--ok-soft)] text-[var(--ok)]" : "bg-[var(--bad-soft)] text-[var(--bad)]";
-              const petrolTone = day.petrolRefillAvailable
-                ? "bg-[var(--accent-soft)] border-[var(--accent)]"
-                : day.petrolCycleIncomplete
-                  ? "border-dashed border-[var(--accent)]"
-                  : "border-transparent";
-
-              return (
-                <div
-                  key={day.date.toISOString()}
-                  aria-label={`${dayNum}, ${day.drivingAllowed ? my.calendar.drivingAllowed : my.calendar.drivingRestricted}`}
-                  className={`grid min-h-12 place-items-center rounded-xl border-2 p-1 text-center text-base font-extrabold tabular-nums sm:min-h-14 ${tone} ${petrolTone} ${day.petrolCycleCompleted ? "ring-2 ring-[var(--accent)]" : ""} ${isToday ? "ring-2 ring-[var(--ink)] ring-offset-2" : ""}`}
-                >
-                  {dayNum}
-                </div>
-              );
-            })}
-          </div>
+          <MonthCalendar anchor={anchor} today={today} timezone={timezone} caption={vehicle.name + " · " + monthTitle} days={days} />
         </section>
       ))}
+
+      {vehicleCalendars.length === 0 ? (
+        <section className="surface-panel overflow-hidden">
+          <MonthCalendar anchor={anchor} today={today} timezone={timezone} caption={monthTitle} />
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t p-5">
+            <p className="text-sm text-[var(--muted)]">{my.calendar.noVehicles}</p>
+            <Link href="/vehicles" className="button-primary">{my.vehicle.addVehicle}</Link>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

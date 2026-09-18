@@ -36,7 +36,7 @@ export function VehicleCard({
           : my.vehicle.waitingNextCycle;
 
   return (
-    <article className="surface-panel overflow-hidden border-l-[4px] border-l-[var(--accent)]">
+    <article className="surface-panel overflow-hidden">
       <div className="p-5 sm:p-7">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -51,15 +51,13 @@ export function VehicleCard({
                 : "border-[var(--bad)]/25 bg-[var(--bad-soft)] text-[var(--bad)]"
             }`}
           >
-            <span aria-hidden="true" className="grid h-5 w-5 place-items-center rounded-full bg-current text-xs text-white">
-              <span className={vehicle.drivingAllowed ? "text-[var(--ok-soft)]" : "text-[var(--bad-soft)]"}>{vehicle.drivingAllowed ? "✓" : "×"}</span>
-            </span>
+            <span aria-hidden="true">{vehicle.drivingAllowed ? "✓" : "×"}</span>
             {vehicle.drivingAllowed ? my.vehicle.driveOk : my.vehicle.restricted}
           </span>
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(16rem,0.65fr)]">
-          <div className="rounded-2xl bg-[var(--accent-soft)]/70 p-4 sm:p-5">
+          <div className="rounded-xl bg-[var(--surface-deep)] p-4 sm:p-5">
             <div className="flex items-end justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-[var(--muted)]">{my.vehicle.remaining(vehicle.remainingLitres)}</p>
@@ -71,13 +69,13 @@ export function VehicleCard({
                 {vehicle.totalTaken} / {vehicle.allowedLitres} L
               </p>
             </div>
-            <div className="meter-track mt-5 h-3" role="progressbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}>
+            <div className="meter-track mt-5 h-2" role="progressbar" aria-label={my.vehicle.petrol} aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}>
               <div className="h-full rounded-full bg-[var(--accent)] transition-all duration-500" style={{ width: `${progress}%` }} />
             </div>
             <p className="mt-3 text-sm font-medium text-[var(--muted)]">{my.vehicle.petrol}</p>
           </div>
 
-          <dl className="divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] bg-white/60 px-4 sm:px-5">
+          <dl className="divide-y divide-[var(--line)] px-4 sm:px-5">
             <div className="py-3.5">
               <dt className="text-xs font-bold text-[var(--muted)]">{my.vehicle.cycleCompleted}</dt>
               <dd className="mt-1 font-semibold">
